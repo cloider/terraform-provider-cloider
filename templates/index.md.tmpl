@@ -1,0 +1,40 @@
+---
+page_title: "Cloider Provider"
+description: |-
+  Manage Cloider clusters, databases, buckets, container registry projects, domains and DNS records.
+---
+
+# Cloider Provider
+
+The Cloider provider manages [Cloider](https://cloider.com) resources with an API token: Kubernetes
+clusters, databases, S3 buckets and their access keys, container registry projects and their tokens,
+domains and DNS records.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+## Authentication
+
+The provider uses the first of these that is set:
+
+1. `token` in the provider block
+2. `token_file` in the provider block
+3. the `CLOIDER_TOKEN` environment variable, the usual choice for CI
+4. the `CLOIDER_TOKEN_FILE` environment variable, for a mounted secret
+5. the token `cloider login` saved for the [Cloider CLI](https://cloider.com) profile in use (`profile`, `CLOIDER_PROFILE`, or the CLI's current profile)
+
+Create a token in the dashboard under Access Control, API Tokens. A token belongs to one account, so
+use one provider block (or an alias) per account. `terraform plan` works with a Read token, `terraform
+apply` needs a Read & Write one.
+
+## Limits
+
+The api allows 100 requests a minute per client. The provider paces itself to stay under that, so a
+large refresh is slower rather than failing. Free accounts have room for one cluster, one database,
+one bucket and one registry project.
+
+Creating a cluster or database waits until it is ready, 20 minutes by default. Give a resource a
+`timeouts` block to wait longer or shorter.
+
+{{ .SchemaMarkdown | trimspace }}

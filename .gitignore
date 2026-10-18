@@ -1,0 +1,9 @@
+# goreleaser
+dist/
+# go build
+terraform-provider-cloider
+# running the examples
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*

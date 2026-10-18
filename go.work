@@ -1,0 +1,6 @@
+go 1.25.0
+
+// Keeps go commands here off services/go.work: the provider builds on its own,
+// as it does in its GitHub mirror, and its dependencies would otherwise raise
+// the versions every service module resolves in the workspace.
+use .
