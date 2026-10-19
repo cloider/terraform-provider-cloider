@@ -14,8 +14,8 @@ import (
 	"github.com/cloider/terraform-provider-cloider/internal/client"
 )
 
-// fakeAPI answers the routes the cluster, database, domain and DNS record
-// resources use, the way the api does, quirks included: lists that hide
+// fakeAPI answers the routes the cluster, database, domain, DNS record and
+// target resources use, the way the api does, quirks included: lists that hide
 // Terminated rows, GET by id that still shows them, plain text 404s. Everything
 // settles at once, so waits return on their first poll.
 type fakeAPI struct {
@@ -25,6 +25,7 @@ type fakeAPI struct {
 	databases map[string]*client.Database
 	domains   map[string]*client.Domain
 	records   map[int64]*client.DnsRecord
+	targets   map[string]*client.Target
 }
 
 func newFakeAPI(t *testing.T) *httptest.Server {
@@ -34,6 +35,7 @@ func newFakeAPI(t *testing.T) *httptest.Server {
 		databases: map[string]*client.Database{},
 		domains:   map[string]*client.Domain{},
 		records:   map[int64]*client.DnsRecord{},
+		targets:   map[string]*client.Target{},
 	}
 	server := httptest.NewServer(f)
 	t.Cleanup(server.Close)
@@ -202,6 +204,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				delete(f.records, id)
 			}
 		}
+		for id, target := range f.targets {
+			if target.DomainName == d.DomainName {
+				delete(f.targets, id)
+			}
+		}
 	case "POST domains":
 		var body struct {
 			Name string `json:"domain_name"`
@@ -240,6 +247,57 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			writeJSON(w, record)
 		}
+
+	// Targets
+	case "GET targets":
+		domain := r.URL.Query().Get("domain_name")
+		if _, ok := f.domains[domain]; !ok {
+			w.WriteHeader(http.StatusForbidden)
+			writeJSON(w, map[string]any{"errors": map[string][]string{"_": {"You don't have permission to access targets for this domain"}}})
+			return
+		}
+		list := []client.Target{}
+		for _, t := range f.targets {
+			if t.DomainName == domain {
+				list = append(list, *t)
+			}
+		}
+		writeJSON(w, list)
+	case "POST targets", "PUT targets/:id", "DELETE targets/:id":
+		var t *client.Target
+		if r.Method == http.MethodPost {
+			t = &client.Target{HashedId: f.id(), CreatedAt: time.Now()}
+		} else if t = f.targets[parts[1]]; t == nil {
+			notFound(w)
+			return
+		}
+		if r.Method == http.MethodDelete {
+			delete(f.targets, t.HashedId)
+			return
+		}
+		var form client.TargetForm
+		json.NewDecoder(r.Body).Decode(&form)
+		if _, ok := f.domains[form.DomainName]; !ok {
+			notFound(w)
+			return
+		}
+		if form.Path == "" {
+			form.Path = "/"
+		}
+		if form.TargetPath == "" {
+			form.TargetPath = form.Path
+		}
+		t.DomainName, t.TargetType, t.Path, t.TargetPath = form.DomainName, form.TargetType, form.Path, form.TargetPath
+		if form.TargetType == "App" {
+			// The api routes an app target from the app itself
+			t.AppId, t.ClusterId, t.ClusterName = form.AppId, "", ""
+			t.Namespace, t.Service, t.Port, t.Protocol = "app-web-"+form.AppId, "app", 8080, "TCP"
+		} else {
+			t.AppId, t.ClusterId, t.ClusterName = "", form.ClusterId, form.ClusterName
+			t.Namespace, t.Service, t.Port, t.Protocol = form.Namespace, form.Service, form.Port, form.Protocol
+		}
+		f.targets[t.HashedId] = t
+		writeJSON(w, client.Created{HashedId: t.HashedId})
 
 	default:
 		http.Error(w, "no fake for "+route, http.StatusNotImplemented)

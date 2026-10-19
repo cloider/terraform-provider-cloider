@@ -1,0 +1,47 @@
+---
+page_title: "cloider_bucket_key Resource - cloider"
+subcategory: "Object Storage"
+description: |-
+  Manages an S3 access key for some or all of your buckets.
+---
+
+# Resource: cloider_bucket_key
+
+Manages an S3 access key for some or all of your
+[`cloider_bucket`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket)s.
+Any S3 client takes it as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, with the bucket's
+`endpoint`.
+
+~> **Note:** The secret key is only shown when the key is created. Terraform keeps it in state, so
+treat the state as sensitive. An imported key has no `secret_key`.
+
+## Example Usage
+
+### Key for One Bucket
+
+{{ tffile "examples/resources/cloider_bucket_key/resource.tf" }}
+
+### Read-Only Key for Every Bucket
+
+{{ tffile "examples/resources/cloider_bucket_key/read-only.tf" }}
+
+### Passing the Key to a Kubernetes Workload
+
+{{ tffile "examples/resources/cloider_bucket_key/kubernetes-secret.tf" }}
+
+### Outputs for an S3 Client
+
+{{ tffile "examples/resources/cloider_bucket_key/outputs.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a key by its id. `cloider bucket key list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_bucket_key/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_bucket_key/import.sh" }}

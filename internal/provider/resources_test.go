@@ -4,10 +4,12 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-testing/compare"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
@@ -207,6 +209,149 @@ resource "cloider_domain" "again" {
 }
 `,
 				ExpectError: regexp.MustCompile(`Domain already added`),
+			},
+		},
+	})
+}
+
+func TestClusterDataSource(t *testing.T) {
+	server := newFakeAPI(t)
+	clusters := fakeProviderConfig(server) + `
+resource "cloider_cluster" "web" {
+  name = "web"
+}
+`
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: clusters},
+			{
+				Config: clusters + `
+data "cloider_cluster" "by_name" {
+  name = "web"
+}
+
+data "cloider_cluster" "by_id" {
+  id = cloider_cluster.web.id
+}
+`,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("data.cloider_cluster.by_name", tfjsonpath.New("version"), knownvalue.StringExact("1.34")),
+					statecheck.ExpectKnownValue("data.cloider_cluster.by_name", tfjsonpath.New("kube_config").AtMapKey("host"), knownvalue.StringExact("https://web.k8s.cloider.com")),
+					statecheck.ExpectKnownValue("data.cloider_cluster.by_id", tfjsonpath.New("name"), knownvalue.StringExact("web")),
+					statecheck.CompareValuePairs("data.cloider_cluster.by_name", tfjsonpath.New("id"), "cloider_cluster.web", tfjsonpath.New("id"), compare.ValuesSame()),
+				},
+			},
+			{
+				Config: clusters + `
+resource "cloider_cluster" "web_too" {
+  name = "web"
+}
+
+data "cloider_cluster" "by_name" {
+  name = "web"
+
+  depends_on = [cloider_cluster.web_too]
+}
+`,
+				ExpectError: regexp.MustCompile(`Several clusters have this name`),
+			},
+			{
+				Config: fakeProviderConfig(server) + `
+data "cloider_cluster" "missing" {
+  name = "nope"
+}
+`,
+				ExpectError: regexp.MustCompile(`No such cluster`),
+			},
+		},
+	})
+}
+
+func TestTargetLifecycle(t *testing.T) {
+	server := newFakeAPI(t)
+	config := func(target string) string {
+		return fakeProviderConfig(server) + `
+resource "cloider_domain" "shop" {
+  name = "shop.cloider.app"
+}
+
+resource "cloider_cluster" "web" {
+  name = "web"
+}
+
+resource "cloider_target" "web" {
+  domain = cloider_domain.shop.name
+` + target + `
+}
+`
+	}
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config(`
+  cluster_id = cloider_cluster.web.id
+  namespace  = "shop"
+  service    = "web"
+  port       = 80
+`),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("path"), knownvalue.StringExact("/")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("target_path"), knownvalue.StringExact("/")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("protocol"), knownvalue.StringExact("TCP")),
+				},
+			},
+			{
+				// target_path follows path when it isn't set
+				Config: config(`
+  path       = "/api"
+  cluster_id = cloider_cluster.web.id
+  namespace  = "shop"
+  service    = "api"
+  port       = 8080
+`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("cloider_target.web", plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("target_path"), knownvalue.StringExact("/api")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("port"), knownvalue.Int64Exact(8080)),
+				},
+			},
+			{
+				ResourceName:      "cloider_target.web",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					rs := s.RootModule().Resources["cloider_target.web"]
+					return rs.Primary.Attributes["domain"] + "/" + rs.Primary.ID, nil
+				},
+			},
+			{
+				// Switching to an app keeps the target, without the cluster's routing
+				Config: config(`
+  path        = "/api"
+  target_path = "/"
+  app_id      = "a1b2c3"
+`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("cloider_target.web", plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("app_id"), knownvalue.StringExact("a1b2c3")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("namespace"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("target_path"), knownvalue.StringExact("/")),
+				},
+			},
+			{
+				Config: config(`
+  app_id     = "a1b2c3"
+  cluster_id = cloider_cluster.web.id
+`),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
 			},
 		},
 	})

@@ -1,14 +1,22 @@
 ---
-page_title: "Cloider Provider"
+page_title: "Provider: Cloider"
 description: |-
-  Manage Cloider clusters, databases, buckets, container registry projects, domains and DNS records.
+  Use the Cloider provider to manage Kubernetes clusters, managed databases, S3 compatible buckets, container registries, domains and DNS records on Cloider.
 ---
 
 # Cloider Provider
 
-The Cloider provider manages [Cloider](https://cloider.com) resources with an API token: Kubernetes
-clusters, databases, S3 buckets and their access keys, container registry projects and their tokens,
-domains and DNS records.
+Use the Cloider provider to manage your [Cloider](https://cloider.com) resources with Terraform or
+OpenTofu: Kubernetes clusters, PostgreSQL, MySQL, MongoDB and Redis databases, S3 compatible buckets
+and their access keys, container registry projects and their tokens, domains, DNS records, and the
+targets that serve a domain from a cluster. You must configure the provider with an API token before
+you can use it.
+
+Use the navigation to the left to read about the available resources and data sources. New to the
+provider? The [Getting Started guide](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/getting-started)
+walks through a first configuration, and the
+[examples folder](https://github.com/cloider/terraform-provider-cloider/tree/main/examples) holds
+complete configurations to start from.
 
 ## Example Usage
 
@@ -24,30 +32,125 @@ terraform {
 
 # Reads the token from CLOIDER_TOKEN, or the one `cloider login` saved
 provider "cloider" {}
+
+# A Kubernetes cluster
+resource "cloider_cluster" "web" {
+  name = "web"
+}
+
+# A PostgreSQL database only that cluster can reach
+resource "cloider_database" "orders" {
+  name            = "orders"
+  engine          = "postgresql"
+  trusted_sources = ["cluster:${cloider_cluster.web.id}"]
+}
 ```
 
-## Authentication
+## Authentication and Configuration
 
-The provider uses the first of these that is set:
+The provider authenticates with a Cloider API token. It takes the first of these that is set:
 
 1. `token` in the provider block
 2. `token_file` in the provider block
-3. the `CLOIDER_TOKEN` environment variable, the usual choice for CI
-4. the `CLOIDER_TOKEN_FILE` environment variable, for a mounted secret
-5. the token `cloider login` saved for the [Cloider CLI](https://cloider.com) profile in use (`profile`, `CLOIDER_PROFILE`, or the CLI's current profile)
+3. the `CLOIDER_TOKEN` environment variable
+4. the `CLOIDER_TOKEN_FILE` environment variable
+5. the token `cloider login` saved for the [Cloider CLI](https://cloider.com/cli) profile in
+   use: `profile` in the provider block, then `CLOIDER_PROFILE`, then the CLI's current profile
 
-Create a token in the dashboard under Access Control, API Tokens. A token belongs to one account, so
-use one provider block (or an alias) per account. `terraform plan` works with a Read token, `terraform
-apply` needs a Read & Write one.
+Create a token in the dashboard under **Access Control**, **API Tokens**. A token belongs to one
+account. `terraform plan` works with a **Read** token, `terraform apply` needs a **Read & Write** one,
+so a CI pipeline can plan merge requests with one and apply the main branch with the other.
+
+### Environment Variables
+
+The usual choice for CI. The provider block can then stay empty:
+
+```shell
+export CLOIDER_TOKEN="cldr_..."
+terraform plan
+```
+
+### Provider Configuration
+
+!> **Warning:** A token written into a configuration ends up in version control and in every copy of
+the code. Pass it in a sensitive variable, or use one of the other sources.
+
+```terraform
+variable "cloider_token" {
+  type      = string
+  sensitive = true
+}
+
+provider "cloider" {
+  token = var.cloider_token
+}
+```
+
+### Token File
+
+For a token mounted as a file, such as a Kubernetes or Docker secret:
+
+```terraform
+provider "cloider" {
+  token_file = "/run/secrets/cloider-token"
+}
+```
+
+### CLI Login
+
+On your own machine, `cloider login` is enough and the provider block can stay empty. To use a token
+saved for another CLI profile:
+
+```terraform
+# Uses the token `cloider login --profile staging` saved
+provider "cloider" {
+  profile = "staging"
+}
+```
+
+### Multiple Accounts
+
+A token reaches one account, so manage several accounts with one provider block each, told apart by
+`alias`:
+
+```terraform
+# One provider block per account, each with that account's token
+provider "cloider" {
+  profile = "acme"
+}
+
+provider "cloider" {
+  alias   = "client"
+  profile = "client"
+}
+
+resource "cloider_bucket" "assets" {
+  name = "acme-assets"
+}
+
+resource "cloider_bucket" "client_assets" {
+  provider = cloider.client
+
+  name = "client-assets"
+}
+```
+
+## Environment Variables Reference
+
+| Variable             | Used for                                                                 |
+|----------------------|--------------------------------------------------------------------------|
+| `CLOIDER_TOKEN`      | The API token, when the provider block sets neither `token` nor `token_file`. |
+| `CLOIDER_TOKEN_FILE` | A file holding the API token, when `CLOIDER_TOKEN` isn't set.             |
+| `CLOIDER_PROFILE`    | The CLI profile whose saved token to use, when no other token is set.     |
+| `CLOIDER_API_URL`    | The api to talk to, when the provider block doesn't set `api_url`.        |
 
 ## Limits
 
-The api allows 100 requests a minute per client. The provider paces itself to stay under that, so a
-large refresh is slower rather than failing. Free accounts have room for one cluster, one database,
-one bucket and one registry project.
-
-Creating a cluster or database waits until it is ready, 20 minutes by default. Give a resource a
-`timeouts` block to wait longer or shorter.
+* **Rate limit.** The api allows 100 requests a minute per client. The provider paces itself to stay
+  under that, so a large refresh is slower rather than failing.
+* **Free accounts** have room for one cluster, one database, one bucket and one registry project.
+* **Timeouts.** Creating a cluster or database waits until it is ready, 20 minutes by default. Set a
+  resource's `timeouts`, such as `timeouts = { create = "40m" }`, to wait longer or shorter.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema

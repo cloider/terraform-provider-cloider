@@ -1,0 +1,79 @@
+---
+page_title: "cloider_cluster Resource - cloider"
+subcategory: "Kubernetes"
+description: |-
+  Manages a Kubernetes cluster.
+---
+
+# Resource: cloider_cluster
+
+Manages a Kubernetes cluster. Creating one waits until it is `Ready`, and its `kube_config` then holds
+what the [`kubernetes`](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs) and
+[`helm`](https://registry.terraform.io/providers/hashicorp/helm/latest/docs) providers need to deploy
+into it.
+
+~> **Note:** A cluster can't be renamed or upgraded in place, so changing `name` or `version`
+replaces the cluster and everything running in it.
+
+-> **Note:** Ingress objects in the cluster aren't served. To reach a Service from the internet, route
+a domain to it with a [`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target).
+To deploy into an existing cluster from another configuration, look it up with the
+[`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/cluster)
+data source.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/resources/cloider_cluster/resource.tf" }}
+
+### Deploying with the Kubernetes Provider
+
+The client certificate authenticates as the cluster's admin. See the
+[Kubernetes and Helm guide](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/kubernetes-and-helm)
+for a whole app, and for when to keep the cluster and what runs in it in separate configurations.
+
+{{ tffile "examples/resources/cloider_cluster/kubernetes-provider.tf" }}
+
+### Installing a Helm Chart
+
+{{ tffile "examples/resources/cloider_cluster/helm-provider.tf" }}
+
+### Writing a Kubeconfig File
+
+With the [`local`](https://registry.terraform.io/providers/hashicorp/local/latest/docs) provider:
+
+{{ tffile "examples/resources/cloider_cluster/kubeconfig-file.tf" }}
+
+### Pausing a Cluster
+
+{{ tffile "examples/resources/cloider_cluster/paused.tf" }}
+
+### Choosing the Kubernetes Version
+
+{{ tffile "examples/resources/cloider_cluster/version.tf" }}
+
+### Timeouts
+
+{{ tffile "examples/resources/cloider_cluster/timeouts.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Timeouts
+
+[Configuration options](https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts):
+
+* `create` - (Default `20m`) Waiting for the cluster to be `Ready`.
+* `update` - (Default `20m`) Waiting for a pause or resume.
+* `delete` - (Default `20m`)
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a cluster by its id. `cloider cluster list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_cluster/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_cluster/import.sh" }}

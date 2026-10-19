@@ -1,0 +1,54 @@
+---
+page_title: "cloider_target Resource - cloider"
+subcategory: "Domains and Routing"
+description: |-
+  Routes a path of a domain to a Service in a Cloider cluster, or to an app.
+---
+
+# Resource: cloider_target
+
+Routes a path of a [`cloider_domain`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain)
+to a Service in a [`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/cluster),
+or to an app. Cloider serves the domain over HTTPS with a certificate of its own and passes requests on
+to the Service's port as plain HTTP.
+
+This is how a cluster's Services are reached from the internet: Ingress objects inside a cluster
+aren't served.
+
+-> **Note:** A domain routes each path to one target. A target's `path` covers everything under it,
+so `/` catches whatever no longer path does.
+
+## Example Usage
+
+### Routing a Domain to a Service
+
+{{ tffile "examples/resources/cloider_target/resource.tf" }}
+
+### Routing Paths to Different Services
+
+{{ tffile "examples/resources/cloider_target/paths.tf" }}
+
+### Rewriting the Path
+
+{{ tffile "examples/resources/cloider_target/target-path.tf" }}
+
+### Routing to a Service the Kubernetes Provider Manages
+
+{{ tffile "examples/resources/cloider_target/kubernetes-service.tf" }}
+
+### Routing to an App
+
+{{ tffile "examples/resources/cloider_target/app.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a target as `<domain>/<id>`. `cloider target list <domain> -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_target/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_target/import.sh" }}

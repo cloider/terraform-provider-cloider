@@ -1,0 +1,24 @@
+---
+page_title: "cloider_bucket_regions Data Source - cloider"
+subcategory: "Object Storage"
+description: |-
+  Lists the regions a bucket can be created in.
+---
+
+# Data Source: cloider_bucket_regions
+
+Lists the regions a
+[`cloider_bucket`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket)
+can be created in, with the S3 endpoint of each. The default region comes first.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/data-sources/cloider_bucket_regions/data-source.tf" }}
+
+### Looking Up a Region by Code
+
+{{ tffile "examples/data-sources/cloider_bucket_regions/by-code.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

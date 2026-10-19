@@ -1,0 +1,56 @@
+---
+page_title: "cloider_registry_token Resource - cloider"
+subcategory: "Container Registry"
+description: |-
+  Manages a token to push and pull images of container registry projects.
+---
+
+# Resource: cloider_registry_token
+
+Manages a token to push and pull the images of some or all of your
+[`cloider_registry`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/registry)
+projects, used as `docker login <host> -u <username> -p <secret>`.
+
+~> **Note:** The secret is only shown when the token is created. Terraform keeps it in state, so treat
+the state as sensitive. An imported token has no `secret`.
+
+## Example Usage
+
+### Push Token for CI
+
+{{ tffile "examples/resources/cloider_registry_token/resource.tf" }}
+
+### Image Pull Secret for a Cluster
+
+A read-only token, handed to a Cloider cluster as an image pull secret with the
+[`kubernetes`](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs) provider.
+
+{{ tffile "examples/resources/cloider_registry_token/pull-secret.tf" }}
+
+### Every Project
+
+{{ tffile "examples/resources/cloider_registry_token/all-projects.tf" }}
+
+### Rotating a Token
+
+With the [`time`](https://registry.terraform.io/providers/hashicorp/time/latest/docs) provider's
+`time_rotating`:
+
+{{ tffile "examples/resources/cloider_registry_token/rotation.tf" }}
+
+### Storing the Token in GitHub Actions
+
+{{ tffile "examples/resources/cloider_registry_token/github-actions.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a token by its id. `cloider registry token list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_registry_token/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_registry_token/import.sh" }}

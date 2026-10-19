@@ -1,0 +1,66 @@
+---
+page_title: "cloider_bucket Resource - cloider"
+subcategory: "Object Storage"
+description: |-
+  Manages an S3 compatible object storage bucket.
+---
+
+# Resource: cloider_bucket
+
+Manages an S3 compatible object storage bucket. Any S3 client or SDK reaches it at its `endpoint`, in
+its `region`, with a
+[`cloider_bucket_key`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket_key).
+See [Using Buckets with S3 Tools](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/object-storage)
+for the AWS CLI, rclone and the AWS provider.
+
+-> **Note:** Bucket names are shared by every Cloider account, so a name has to be one nobody else
+has. Changing `name` or `region` replaces the bucket.
+
+## Example Usage
+
+### Private Bucket
+
+{{ tffile "examples/resources/cloider_bucket/resource.tf" }}
+
+### Public Bucket
+
+{{ tffile "examples/resources/cloider_bucket/public.tf" }}
+
+### Versioning
+
+{{ tffile "examples/resources/cloider_bucket/versioning.tf" }}
+
+### Bucket with an Access Key
+
+{{ tffile "examples/resources/cloider_bucket/with-key.tf" }}
+
+### Region
+
+The regions, with their endpoints, are listed by
+[`cloider_bucket_regions`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/bucket_regions).
+
+{{ tffile "examples/resources/cloider_bucket/region.tf" }}
+
+### One Bucket per Environment
+
+{{ tffile "examples/resources/cloider_bucket/for-each.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Timeouts
+
+[Configuration options](https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts):
+
+* `create` - (Default `20m`)
+* `delete` - (Default `20m`)
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a bucket by its id. `cloider bucket list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_bucket/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_bucket/import.sh" }}

@@ -43,7 +43,7 @@ func (p *cloiderProvider) Metadata(_ context.Context, _ provider.MetadataRequest
 
 func (p *cloiderProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages Cloider clusters, databases, buckets, container registry projects, domains and DNS records with an API token.",
+		MarkdownDescription: "Manages Cloider clusters, databases, buckets, container registry projects, domains, DNS records and the targets that route domains to clusters and apps, with an API token.",
 		Attributes: map[string]schema.Attribute{
 			"api_url": schema.StringAttribute{
 				MarkdownDescription: "The api to talk to. Defaults to `CLOIDER_API_URL`, then `" + client.DefaultAPIURL + "`.",
@@ -123,6 +123,7 @@ func (p *cloiderProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewRegistryTokenResource,
 		NewDomainResource,
 		NewDnsRecordResource,
+		NewTargetResource,
 	}
 }
 
@@ -130,5 +131,6 @@ func (p *cloiderProvider) DataSources(_ context.Context) []func() datasource.Dat
 	return []func() datasource.DataSource{
 		NewOptionsDataSource,
 		NewBucketRegionsDataSource,
+		NewClusterDataSource,
 	}
 }

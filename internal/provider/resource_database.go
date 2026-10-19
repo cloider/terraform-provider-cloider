@@ -133,7 +133,7 @@ func (r *databaseResource) Schema(ctx context.Context, _ resource.SchemaRequest,
 				)},
 			},
 			"label": schema.StringAttribute{
-				MarkdownDescription: "The name the dashboard shows. Defaults to `name`, with a `-1`, `-2`... suffix when another database has it. It has to be unique among your databases.",
+				MarkdownDescription: "The name the dashboard shows: lower case letters, digits and `-`, starting with a letter. Defaults to `name`, with a `-1`, `-2`... suffix when another database has it. It has to be unique among your databases.",
 				Optional:            true,
 				Computed:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},

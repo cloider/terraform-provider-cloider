@@ -80,7 +80,7 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Default:             stringdefault.StaticString(""),
 			},
 			"values": schema.ListAttribute{
-				MarkdownDescription: "The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. A `CNAME` takes one.",
+				MarkdownDescription: "The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. Each `TXT` value is a TXT record of its own. A `CNAME` takes one.",
 				ElementType:         types.StringType,
 				Required:            true,
 				Validators: []validator.List{

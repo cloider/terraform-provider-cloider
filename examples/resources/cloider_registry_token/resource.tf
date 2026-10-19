@@ -15,3 +15,8 @@ output "registry_login" {
     username = cloider_registry_token.ci.username
   }
 }
+
+output "registry_password" {
+  value     = cloider_registry_token.ci.secret
+  sensitive = true
+}

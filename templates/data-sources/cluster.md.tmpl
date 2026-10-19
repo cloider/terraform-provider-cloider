@@ -1,0 +1,34 @@
+---
+page_title: "cloider_cluster Data Source - cloider"
+subcategory: "Kubernetes"
+description: |-
+  Looks up an existing Kubernetes cluster by id or name.
+---
+
+# Data Source: cloider_cluster
+
+Looks up an existing [`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/cluster)
+by `id` or `name`, with the `kube_config` the
+[`kubernetes`](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs) and
+[`helm`](https://registry.terraform.io/providers/hashicorp/helm/latest/docs) providers need. Use it to
+deploy into a cluster from a configuration other than the one that created it, or into one created in
+the dashboard.
+
+-> **Note:** Cluster names don't have to be unique. A name several clusters have is refused, so look
+those up by `id`.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/data-sources/cloider_cluster/data-source.tf" }}
+
+### Configuring the Kubernetes and Helm Providers
+
+{{ tffile "examples/data-sources/cloider_cluster/kubernetes-provider.tf" }}
+
+### Trusting an Existing Cluster
+
+{{ tffile "examples/data-sources/cloider_cluster/database-trust.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

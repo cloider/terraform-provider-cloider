@@ -1,0 +1,34 @@
+---
+page_title: "cloider_options Data Source - cloider"
+subcategory: "Platform"
+description: |-
+  Lists what can be created at the moment: Kubernetes versions, database engines and plans, subdomain roots and nameservers.
+---
+
+# Data Source: cloider_options
+
+Lists what can be created at the moment: the Kubernetes versions a
+[`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/cluster)
+can run, the engines, versions and plans of a
+[`cloider_database`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/database),
+the roots a free subdomain goes under, and the nameservers a custom domain points at.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/data-sources/cloider_options/data-source.tf" }}
+
+### Newest Kubernetes Version
+
+{{ tffile "examples/resources/cloider_cluster/version.tf" }}
+
+### Newest Version of a Database Engine
+
+{{ tffile "examples/data-sources/cloider_options/database-version.tf" }}
+
+### Checking a Variable Against What Is Offered
+
+{{ tffile "examples/data-sources/cloider_options/validation.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

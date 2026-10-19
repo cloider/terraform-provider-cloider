@@ -1,0 +1,75 @@
+---
+page_title: "Deploying to a Cluster with the Kubernetes and Helm Providers"
+subcategory: ""
+description: |-
+  Deploy apps and Helm charts into a Cloider cluster from Terraform.
+---
+
+# Deploying to a Cluster with the Kubernetes and Helm Providers
+
+A [`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/cluster)'s
+`kube_config` holds what the [`kubernetes`](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs)
+and [`helm`](https://registry.terraform.io/providers/hashicorp/helm/latest/docs) providers need to
+deploy into it. This guide runs an app from a Cloider registry project against a Cloider database, and
+serves it on a domain.
+The whole configuration is in
+[`examples/kubernetes-app`](https://github.com/cloider/terraform-provider-cloider/tree/main/examples/kubernetes-app).
+
+## Configure the Providers
+
+The cluster's kubeconfig authenticates with a client certificate, as the cluster's admin:
+
+{{ tffile "examples/guides/kubernetes-and-helm/providers.tf" }}
+
+-> **Note:** The helm provider 3.x takes `kubernetes` as an attribute, `kubernetes = { ... }`. The 2.x
+releases took it as a block.
+
+## One Configuration or Two
+
+A provider configured from a resource can't reach the cluster before the cluster exists, so choose one
+of these.
+
+### One Configuration, Applied in Two Steps
+
+Create the cluster on its own first, then everything else. Later applies need no `-target`. This suits
+a cluster that is rarely replaced, such as one per app:
+
+{{ codefile "shell" "examples/guides/kubernetes-and-helm/two-step.sh" }}
+
+### Two Configurations
+
+One configuration creates the Cloider resources, a second one deploys into the cluster. HashiCorp
+recommends this for the kubernetes provider, since a plan that replaces the cluster can't plan what
+runs in it. The second one looks the cluster up with the
+[`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/cluster)
+data source:
+
+{{ tffile "examples/guides/kubernetes-and-helm/data-source.tf" }}
+
+Or the first one outputs the kubeconfig:
+
+{{ tffile "examples/guides/kubernetes-and-helm/platform-outputs.tf" }}
+
+and the second one reads it with `terraform_remote_state`:
+
+{{ tffile "examples/guides/kubernetes-and-helm/remote-state.tf" }}
+
+## Deploy an App
+
+The app's image is pulled from a [`cloider_registry`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/registry)
+project with a read-only token, handed to the cluster as an image pull secret. The database only
+trusts the cluster, which reaches it at `private_host`:
+
+{{ tffile "examples/kubernetes-app/main.tf" }}
+
+## Install a Helm Chart
+
+{{ tffile "examples/guides/kubernetes-and-helm/helm-release.tf" }}
+
+## Reach the App from the Internet
+
+Ingress objects in a Cloider cluster aren't served. A
+[`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target)
+routes a domain to a Service instead, over HTTPS, as the end of the configuration above does with a
+free `cloider.app` subdomain. A target can also route single paths, such as `/api`, to Services of
+their own.

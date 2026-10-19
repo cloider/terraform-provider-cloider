@@ -1,0 +1,49 @@
+---
+page_title: "Storing Terraform State in a Bucket"
+subcategory: ""
+description: |-
+  Keep Terraform state in a Cloider bucket with the s3 backend, locking included.
+---
+
+# Storing Terraform State in a Bucket
+
+Terraform's [`s3` backend](https://developer.hashicorp.com/terraform/language/backend/s3) works with a
+[`cloider_bucket`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket),
+locking included, so a team or a CI pipeline can share one state without overwriting each other's
+changes.
+
+## Before You Begin
+
+* Terraform 1.10 or later, or OpenTofu 1.10 or later, for `use_lockfile`.
+
+## Create the Bucket and a Key
+
+Create the bucket in a configuration of its own, so the state it holds never depends on itself. A
+versioned bucket keeps every earlier state, to go back to one that a mistake overwrote:
+
+{{ tffile "examples/guides/state-backend/bucket.tf" }}
+
+## Configure the Backend
+
+In each configuration whose state goes in the bucket, give it a `key` of its own:
+
+{{ tffile "examples/guides/state-backend/backend.tf" }}
+
+The backend reads the key from the usual AWS environment variables. Keep them out of the backend
+block, which Terraform saves in plain text under `.terraform/`:
+
+{{ codefile "shell" "examples/guides/state-backend/env.sh" }}
+
+A configuration that already has a state moves it into the bucket with:
+
+{{ codefile "shell" "examples/guides/state-backend/migrate.sh" }}
+
+## Locking
+
+With `use_lockfile`, a plan or apply first writes `<key>.tflock` next to the state, a write that only
+succeeds when no lock file exists. While it holds the lock, any other run against the same state
+stops with `Error acquiring the state lock`, or waits as long as `-lock-timeout` allows. The lock file
+is removed when the run ends.
+
+~> **Note:** A run that was killed can leave its lock behind. Once you are sure nothing else is
+running, release it with `terraform force-unlock <lock id>`, the id the error message shows.

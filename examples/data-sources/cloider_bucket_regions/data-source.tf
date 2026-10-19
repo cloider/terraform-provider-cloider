@@ -1,6 +1,5 @@
 data "cloider_bucket_regions" "all" {}
 
-resource "cloider_bucket" "assets" {
-  name   = "acme-assets"
-  region = data.cloider_bucket_regions.all.regions[0].code
+output "bucket_regions" {
+  value = { for r in data.cloider_bucket_regions.all.regions : r.code => r.name }
 }

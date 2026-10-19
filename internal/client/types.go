@@ -207,3 +207,36 @@ type DnsRecordForm struct {
 	RecordValue string `json:"record_value"`
 	Ttl         int    `json:"ttl"`
 }
+
+// Targets route a path of a domain to a cluster service or an app. Cluster
+// targets carry the cluster's id and routing fields, app targets only app_id:
+// the api fills in the rest from the app.
+type Target struct {
+	HashedId    string    `json:"hashed_id"`
+	DomainName  string    `json:"domain_name"`
+	TargetType  string    `json:"target_type"`
+	ClusterId   string    `json:"cluster_id"`
+	ClusterName string    `json:"cluster_name"`
+	AppId       string    `json:"app_id"`
+	Namespace   string    `json:"namespace"`
+	Service     string    `json:"service"`
+	Port        int       `json:"port"`
+	Protocol    string    `json:"protocol"`
+	Path        string    `json:"path"`
+	TargetPath  string    `json:"target_path"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type TargetForm struct {
+	DomainName  string `json:"domain_name"`
+	TargetType  string `json:"target_type"`
+	Path        string `json:"path"`
+	TargetPath  string `json:"target_path"`
+	ClusterId   string `json:"cluster_id,omitempty"`
+	ClusterName string `json:"cluster_name,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	Service     string `json:"service,omitempty"`
+	Port        int    `json:"port,omitempty"`
+	Protocol    string `json:"protocol,omitempty"`
+	AppId       string `json:"app_id,omitempty"`
+}

@@ -1,0 +1,89 @@
+---
+page_title: "cloider_database Resource - cloider"
+subcategory: "Databases"
+description: |-
+  Manages a PostgreSQL, MySQL, MongoDB or Redis database.
+---
+
+# Resource: cloider_database
+
+Manages a PostgreSQL, MySQL, MongoDB or Redis database. Creating one waits until it is `Ready`.
+
+Clients connect at `host` from anywhere `trusted_sources` allows, and at `private_host` from your
+clusters and apps, inside Cloider's network. With `ssl` on, the server's certificate is signed by
+Cloider's own CA, `ca_certificate`, so a client that verifies certificates needs it.
+
+~> **Note:** `name`, `engine`, `version` and `user` can't change, and a plan can only be resized up,
+so changing those replaces the database and its data. Consider `prevent_destroy`, as in the example
+below.
+
+~> **Note:** The password is kept in Terraform's state, so treat the state as sensitive.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/resources/cloider_database/resource.tf" }}
+
+### Restricting Who May Connect
+
+`trusted_sources` defaults to `["*"]`, anywhere. List your clusters, apps and networks instead:
+
+{{ tffile "examples/resources/cloider_database/trusted-sources.tf" }}
+
+### MySQL, MongoDB and Redis
+
+{{ tffile "examples/resources/cloider_database/engines.tf" }}
+
+### Connection Strings
+
+{{ tffile "examples/resources/cloider_database/connection-strings.tf" }}
+
+### Passing Credentials to a Kubernetes Workload
+
+{{ tffile "examples/resources/cloider_database/kubernetes-secret.tf" }}
+
+### Resizing
+
+{{ tffile "examples/resources/cloider_database/resize.tf" }}
+
+### Protecting a Production Database
+
+{{ tffile "examples/resources/cloider_database/prevent-destroy.tf" }}
+
+### Custom User and Label
+
+{{ tffile "examples/resources/cloider_database/custom-user.tf" }}
+
+### Redis without TLS
+
+{{ tffile "examples/resources/cloider_database/redis-plaintext.tf" }}
+
+### Pausing a Database
+
+{{ tffile "examples/resources/cloider_database/paused.tf" }}
+
+### Timeouts
+
+{{ tffile "examples/resources/cloider_database/timeouts.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Timeouts
+
+[Configuration options](https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts):
+
+* `create` - (Default `20m`) Waiting for the database to be `Ready`.
+* `update` - (Default `20m`) Waiting for a resize, an SSL change, a pause or a resume.
+* `delete` - (Default `20m`)
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a database by its id. `cloider db list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_database/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_database/import.sh" }}

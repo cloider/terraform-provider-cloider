@@ -1,0 +1,114 @@
+---
+page_title: "Getting Started with the Cloider Provider"
+subcategory: ""
+description: |-
+  Create a Kubernetes cluster, a database and a bucket on Cloider with Terraform.
+---
+
+# Getting Started with the Cloider Provider
+
+This guide creates a Kubernetes cluster, a PostgreSQL database only the cluster can reach, and a bucket
+with an access key for it. It fits in a free Cloider account. The whole configuration is in
+[`examples/getting-started`](https://github.com/cloider/terraform-provider-cloider/tree/main/examples/getting-started).
+
+## Before You Begin
+
+* A [Cloider](https://cloider.com) account.
+* [Terraform](https://developer.hashicorp.com/terraform/install) 1.5 or later, or
+  [OpenTofu](https://opentofu.org/docs/intro/install/) 1.6 or later.
+* An API token from the dashboard's **Access Control**, **API Tokens**, with **Read & Write**
+  permission. On your own machine, logging in with the [Cloider CLI](https://cloider.com/cli) works too.
+
+## Authenticate
+
+Hand the provider the token in an environment variable:
+
+```shell
+export CLOIDER_TOKEN="cldr_..."
+```
+
+Or log in with the CLI, whose token the provider uses when no other is set:
+
+```shell
+cloider login
+```
+
+## Write the Configuration
+
+Create a folder for the configuration. First require the provider:
+
+{{ tffile "examples/getting-started/versions.tf" }}
+
+Bucket names are shared by every Cloider account, so the bucket's name takes a prefix of your choice:
+
+{{ tffile "examples/getting-started/variables.tf" }}
+
+Then the resources. The database's `trusted_sources` only lets the cluster connect, and the key only
+reaches the one bucket:
+
+{{ tffile "examples/getting-started/main.tf" }}
+
+And outputs, to connect to what was created. Outputs holding a secret are marked sensitive, so
+Terraform only prints them when asked:
+
+{{ tffile "examples/getting-started/outputs.tf" }}
+
+## Create the Resources
+
+Download the provider, then review and apply the plan:
+
+```shell
+terraform init
+terraform apply -var prefix=acme
+```
+
+Terraform waits until the cluster and the database are ready, which takes a few minutes.
+
+## Use the Cluster
+
+Save the cluster's kubeconfig and point `kubectl` at it:
+
+```shell
+terraform output -raw kubeconfig > kubeconfig.yaml
+export KUBECONFIG="$PWD/kubeconfig.yaml"
+kubectl get namespaces
+```
+
+Apps in the cluster reach the database at `database_host` and `database_port`, as `database_user`
+with `terraform output -raw database_password`. The
+[Kubernetes and Helm guide](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/kubernetes-and-helm)
+shows how to hand those to a deployment from Terraform itself.
+
+!> **Warning:** `kubeconfig.yaml` gives full access to the cluster. Keep it out of version control.
+
+## Make a Change
+
+Edit the configuration and apply again, and Terraform changes only what differs. Pausing the cluster
+keeps its state and stops billing it for compute:
+
+```terraform
+resource "cloider_cluster" "main" {
+  name   = "main"
+  paused = true
+}
+```
+
+Read each resource's page for what can change in place and what replaces the resource. A database's
+plan, for example, can be resized up in place, but a smaller plan replaces the database and its data.
+
+## Clean Up
+
+Delete everything this configuration created:
+
+```shell
+terraform destroy -var prefix=acme
+```
+
+## Next Steps
+
+* [Deploying to a Cluster with the Kubernetes and Helm Providers](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/kubernetes-and-helm)
+* [Using Buckets with S3 Tools](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/object-storage)
+* [Storing Terraform State in a Bucket](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/state-backend)
+* [Importing Existing Resources](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/importing-resources)
+* The [examples folder](https://github.com/cloider/terraform-provider-cloider/tree/main/examples),
+  with complete configurations for an app on Kubernetes, DNS for a domain, and more.

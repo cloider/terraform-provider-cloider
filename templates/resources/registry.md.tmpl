@@ -1,0 +1,49 @@
+---
+page_title: "cloider_registry Resource - cloider"
+subcategory: "Container Registry"
+description: |-
+  Manages a container registry project.
+---
+
+# Resource: cloider_registry
+
+Manages a container registry project, where images are pushed to and pulled from as
+`<url>/<repository>:<tag>`. Push and pull private images with a
+[`cloider_registry_token`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/registry_token).
+
+-> **Note:** Project names are shared by every Cloider account, so a name has to be one nobody else
+has. Changing `name` replaces the project, and its images with it.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/resources/cloider_registry/resource.tf" }}
+
+### Immutable Tags
+
+{{ tffile "examples/resources/cloider_registry/production.tf" }}
+
+### Public Project
+
+{{ tffile "examples/resources/cloider_registry/public.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Timeouts
+
+[Configuration options](https://developer.hashicorp.com/terraform/language/resources/syntax#operation-timeouts):
+
+* `create` - (Default `20m`)
+* `delete` - (Default `20m`)
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a project by its id. `cloider registry list -o wide` shows the ids:
+
+{{ tffile "examples/resources/cloider_registry/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_registry/import.sh" }}

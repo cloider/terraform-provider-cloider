@@ -1,0 +1,50 @@
+---
+page_title: "cloider_domain Resource - cloider"
+subcategory: "Domains and Routing"
+description: |-
+  Manages a free Cloider subdomain or a domain you own.
+---
+
+# Resource: cloider_domain
+
+Manages a domain: either a free subdomain under one of Cloider's roots, such as `my-app.cloider.app`,
+or a domain you own. A name under one of the roots in
+[`cloider_options`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/options)'
+`subdomain_roots` is claimed as a free subdomain, any other name is added as a custom domain.
+
+A custom domain is served by Cloider's DNS once its registrar points it at the `nameservers` in
+`cloider_options`. Add its records with
+[`cloider_dns_record`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/dns_record).
+
+!> **Warning:** Deleting a domain also deletes its DNS records and the routes to it.
+
+## Example Usage
+
+### Free Subdomain
+
+{{ tffile "examples/resources/cloider_domain/resource.tf" }}
+
+### Subdomain of the First Root Offered
+
+{{ tffile "examples/resources/cloider_domain/subdomain-root.tf" }}
+
+### Custom Domain
+
+{{ tffile "examples/resources/cloider_domain/custom-domain.tf" }}
+
+### Custom Domain with Records
+
+{{ tffile "examples/resources/cloider_domain/with-records.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a domain by its name:
+
+{{ tffile "examples/resources/cloider_domain/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_domain/import.sh" }}

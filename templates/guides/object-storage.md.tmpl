@@ -1,0 +1,74 @@
+---
+page_title: "Using Buckets with S3 Tools"
+subcategory: ""
+description: |-
+  Reach Cloider buckets with the AWS CLI, AWS SDKs, rclone and the AWS provider.
+---
+
+# Using Buckets with S3 Tools
+
+A [`cloider_bucket`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket)
+speaks the S3 api, so the AWS CLI, every AWS SDK, rclone and the
+[`aws`](https://registry.terraform.io/providers/hashicorp/aws/latest/docs) provider work with it.
+They need four settings:
+
+| Setting    | Value                                                                    |
+|------------|--------------------------------------------------------------------------|
+| Endpoint   | The bucket's `endpoint`, such as `https://s3.eu-central-2.cloider.com`   |
+| Region     | The bucket's `region`, such as `eu-central-2`                            |
+| Access key | A `cloider_bucket_key`'s `access_key`                                    |
+| Secret key | The same key's `secret_key`                                              |
+
+The regions and their endpoints are listed by
+[`cloider_bucket_regions`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/bucket_regions).
+
+## Create a Bucket and a Key
+
+{{ tffile "examples/resources/cloider_bucket/with-key.tf" }}
+
+Output the secret key too, to hand it to the tools below:
+
+{{ tffile "examples/guides/object-storage/outputs.tf" }}
+
+~> **Note:** The secret key is only shown when the key is created, so it can't be read back later. Keep
+it in Terraform's state, or recreate the key.
+
+## AWS CLI
+
+A `cloider` profile, as the dashboard shows it:
+
+{{ codefile "shell" "examples/guides/object-storage/aws-cli.sh" }}
+
+## AWS SDKs and Other Clients
+
+The AWS SDKs read these environment variables, `AWS_ENDPOINT_URL_S3` included:
+
+{{ codefile "shell" "examples/guides/object-storage/env.sh" }}
+
+## rclone
+
+{{ codefile "ini" "examples/guides/object-storage/rclone.conf" }}
+
+## Uploading Files with the AWS Provider
+
+Keep the files in a configuration of their own, with the key in its environment, rather than in the
+one that creates the key:
+
+{{ tffile "examples/guides/object-storage/aws-provider.tf" }}
+
+## Passing a Key to a Kubernetes Workload
+
+Hand the same settings to an app in a Cloider cluster as a Secret, as the
+[`cloider_bucket_key`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket_key#passing-the-key-to-a-kubernetes-workload)
+examples show.
+
+## Terraform State
+
+A bucket can hold Terraform's own state too, see
+[Storing Terraform State in a Bucket](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/state-backend).
+
+## Public Files
+
+A bucket with `public = true` serves each file without a key at `<url>/<key>`, where `url` is the
+bucket's, such as `https://acme-assets.s3.eu-central-2.cloider.com/logo.png`. Listing the bucket and
+changing its files still need a key.

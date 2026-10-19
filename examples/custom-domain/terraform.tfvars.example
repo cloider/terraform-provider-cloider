@@ -1,0 +1,19 @@
+domain   = "example.com"
+web_ipv4 = ["203.0.113.10", "203.0.113.11"]
+
+mail_servers       = ["10 mx1.mail.example.net.", "20 mx2.mail.example.net."]
+spf                = "v=spf1 include:mail.example.net ~all"
+dmarc_report_email = "dmarc@example.com"
+
+extra_records = {
+  status = {
+    name   = "status"
+    type   = "CNAME"
+    values = ["status.example.net."]
+  }
+  sip = {
+    name   = "_sip._tcp"
+    type   = "SRV"
+    values = ["10 60 5060 sip.example.com."]
+  }
+}

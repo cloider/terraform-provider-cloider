@@ -1,7 +1,8 @@
 # Terraform provider for Cloider
 
 Manages [Cloider](https://cloider.com) clusters, databases, buckets and their keys, container
-registry projects and their tokens, domains and DNS records, with Terraform or OpenTofu.
+registry projects and their tokens, domains, DNS records and the targets that serve a domain from a
+cluster, with Terraform or OpenTofu.
 
 ```hcl
 terraform {
@@ -26,7 +27,35 @@ resource "cloider_database" "orders" {
 ```
 
 The provider takes its API token from `CLOIDER_TOKEN`, or from `cloider login` on your own machine.
-The full reference is on the [Terraform Registry](https://registry.terraform.io/providers/cloider/cloider/latest/docs).
+
+## Documentation
+
+The full reference is on the [Terraform Registry](https://registry.terraform.io/providers/cloider/cloider/latest/docs),
+with examples for every resource and these guides:
+
+* [Getting Started](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/getting-started)
+* [Deploying to a Cluster with the Kubernetes and Helm Providers](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/kubernetes-and-helm)
+* [Using Buckets with S3 Tools](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/object-storage)
+* [Storing Terraform State in a Bucket](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/state-backend)
+* [Importing Existing Resources](https://registry.terraform.io/providers/cloider/cloider/latest/docs/guides/importing-resources)
+
+## Examples
+
+Complete configurations to start from are in [`examples/`](examples):
+
+| Example                                                  | What it creates                                                              |
+|----------------------------------------------------------|------------------------------------------------------------------------------|
+| [getting-started](examples/getting-started)              | A cluster, a database only it can reach, and a bucket with a key.            |
+| [kubernetes-app](examples/kubernetes-app)                | An app on its own cluster, with its registry project, database and domain.   |
+| [custom-domain](examples/custom-domain)                  | DNS for a domain you own: web, mail and any other records.                   |
+| [multiple-environments](examples/multiple-environments)  | Staging and production from one module.                                      |
+
+## Requirements
+
+* [Terraform](https://developer.hashicorp.com/terraform/install) 1.0 or later, or
+  [OpenTofu](https://opentofu.org/docs/intro/install/) 1.6 or later. `import` blocks need Terraform 1.5.
+* A [Cloider](https://cloider.com) account and an API token, from Access Control, API Tokens in the
+  dashboard.
 
 This repository is a mirror. The provider is developed in Cloider's monorepo, next to the api it
 talks to, and is pushed here on every release. Issues are welcome here, but pull requests can't be
@@ -45,7 +74,10 @@ go generate ./...              # regenerates docs/ from the schema, examples/ an
 ```
 
 `docs/` is generated, edit the schema descriptions, `examples/` or `templates/` instead. CI fails
-when `docs/` doesn't match.
+when `docs/` doesn't match. Every resource and data source has its own page template in
+`templates/resources/` or `templates/data-sources/`, which names the example files it shows, so a new
+example file needs a line in its template too. A new resource needs a template of its own, or it gets
+tfplugindocs' default page, without a subcategory.
 
 To run a local build, point Terraform at it in `~/.terraformrc`:
 

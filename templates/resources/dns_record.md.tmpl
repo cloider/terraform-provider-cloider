@@ -1,0 +1,71 @@
+---
+page_title: "cloider_dns_record Resource - cloider"
+subcategory: "Domains and Routing"
+description: |-
+  Manages a DNS record set of a custom domain.
+---
+
+# Resource: cloider_dns_record
+
+Manages a DNS record set of a custom [`cloider_domain`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain):
+every value of one type at one name. Cloider keeps one record per type and name, so list all of a
+name's values in one resource rather than one resource per value.
+
+-> **Note:** Only a domain you own takes records. The domain answers them once its registrar points
+it at the nameservers in [`cloider_options`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/options).
+Free subdomains under Cloider's roots, such as `my-app.cloider.app`, don't take records.
+
+## Example Usage
+
+### Basic Usage
+
+{{ tffile "examples/resources/cloider_dns_record/resource.tf" }}
+
+### The Domain Itself
+
+Leave `name` out for a record at the domain itself, often called the apex or `@`.
+
+{{ tffile "examples/resources/cloider_dns_record/apex.tf" }}
+
+### CNAME Record
+
+{{ tffile "examples/resources/cloider_dns_record/cname.tf" }}
+
+### Mail Records
+
+MX values are a priority and a host. A host ending in a dot is a full name, as in a zone file.
+
+{{ tffile "examples/resources/cloider_dns_record/mail.tf" }}
+
+### TXT Records
+
+{{ tffile "examples/resources/cloider_dns_record/txt.tf" }}
+
+### CAA Record
+
+{{ tffile "examples/resources/cloider_dns_record/caa.tf" }}
+
+### Wildcard Record
+
+{{ tffile "examples/resources/cloider_dns_record/wildcard.tf" }}
+
+### SRV Record
+
+{{ tffile "examples/resources/cloider_dns_record/srv.tf" }}
+
+### Many Records from a Map
+
+{{ tffile "examples/resources/cloider_dns_record/for-each.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+In Terraform v1.5.0 and later, use an [`import` block](https://developer.hashicorp.com/terraform/language/import)
+to import a DNS record by its id. `cloider dns list <domain>` shows the ids:
+
+{{ tffile "examples/resources/cloider_dns_record/import-by-string-id.tf" }}
+
+Using [`terraform import`](https://developer.hashicorp.com/terraform/cli/commands/import):
+
+{{ codefile "shell" "examples/resources/cloider_dns_record/import.sh" }}
