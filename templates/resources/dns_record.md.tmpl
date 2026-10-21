@@ -31,6 +31,12 @@ Leave `name` out for a record at the domain itself, often called the apex or `@`
 
 {{ tffile "examples/resources/cloider_dns_record/cname.tf" }}
 
+### ALIAS Record
+
+An `ALIAS` takes one host name and can't share its name with `A`, `AAAA` or `CNAME` records. Creating one at the domain itself replaces the `A` record the domain was created with while that record still points at Cloider. If it points elsewhere, the `ALIAS` is refused until that `A` record is deleted.
+
+{{ tffile "examples/resources/cloider_dns_record/alias.tf" }}
+
 ### Mail Records
 
 MX values are a priority and a host. A host ending in a dot is a full name, as in a zone file.

@@ -67,6 +67,21 @@ resource "cloider_dns_record" "docs" {
 }
 ```
 
+### ALIAS Record
+
+An `ALIAS` takes one host name and can't share its name with `A`, `AAAA` or `CNAME` records. Creating one at the domain itself replaces the `A` record the domain was created with while that record still points at Cloider. If it points elsewhere, the `ALIAS` is refused until that `A` record is deleted.
+
+```terraform
+# An ALIAS points the domain itself at a host name, where a CNAME can't go.
+# Cloider answers A and AAAA lookups with the target's current addresses.
+resource "cloider_dns_record" "apex_alias" {
+  domain = "example.com"
+  type   = "ALIAS"
+  values = ["myapp.herokuapp.com"]
+  ttl    = 300
+}
+```
+
 ### Mail Records
 
 MX values are a priority and a host. A host ending in a dot is a full name, as in a zone file.
@@ -191,12 +206,12 @@ resource "cloider_dns_record" "this" {
 
 - `domain` (String) The custom domain the record belongs to. Subdomains under Cloider's roots don't take records. Changing it replaces the record.
 - `ttl` (Number) Seconds resolvers may cache the record, 60 to 172800.
-- `type` (String) `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `CAA`, `HTTPS`, `SPF`, `SRV`, `PTR`.
-- `values` (List of String) The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. Each `TXT` value is a TXT record of its own. A `CNAME` takes one.
+- `type` (String) `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`, `CAA`, `HTTPS`, `SPF`, `SRV`, `PTR`, `ALIAS`.
+- `values` (List of String) The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. Each `TXT` value is a TXT record of its own. A `CNAME` or `ALIAS` takes one host name.
 
 ### Optional
 
-- `name` (String) The name under the domain, such as `www`. Defaults to `""`, the domain itself.
+- `name` (String) The name under the domain, such as `www`. Defaults to `""`, the domain itself, which can't be written `@`.
 
 ### Read-Only
 

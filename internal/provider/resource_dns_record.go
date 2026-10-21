@@ -27,7 +27,7 @@ var (
 	_ resource.ResourceWithImportState = &dnsRecordResource{}
 )
 
-var dnsRecordTypes = []string{"A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "HTTPS", "SPF", "SRV", "PTR"}
+var dnsRecordTypes = []string{"A", "AAAA", "CNAME", "MX", "TXT", "NS", "CAA", "HTTPS", "SPF", "SRV", "PTR", "ALIAS"}
 
 type dnsRecordResource struct {
 	resourceBase
@@ -49,6 +49,9 @@ type dnsRecordModel struct {
 // The api trims each value and drops empty ones, so only single trimmed lines
 // read back as written.
 var dnsRecordValue = regexp.MustCompile(`^\S(?:[^\n]*\S)?$`)
+
+// The api saves a name of "@" as "", so it would read back changed
+var dnsRecordName = regexp.MustCompile(`(?s)^(?:[^@].*|@.+)?$`)
 
 func (r *dnsRecordResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_dns_record"
@@ -74,13 +77,14 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Validators:          []validator.String{stringvalidator.OneOf(dnsRecordTypes...)},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name under the domain, such as `www`. Defaults to `\"\"`, the domain itself.",
+				MarkdownDescription: "The name under the domain, such as `www`. Defaults to `\"\"`, the domain itself, which can't be written `@`.",
 				Optional:            true,
 				Computed:            true,
 				Default:             stringdefault.StaticString(""),
+				Validators:          []validator.String{stringvalidator.RegexMatches(dnsRecordName, "must not be \"@\", leave name out for the domain itself")},
 			},
 			"values": schema.ListAttribute{
-				MarkdownDescription: "The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. Each `TXT` value is a TXT record of its own. A `CNAME` takes one.",
+				MarkdownDescription: "The record's values, such as IP addresses for `A` or `10 mail.example.com.` for `MX`. Each `TXT` value is a TXT record of its own. A `CNAME` or `ALIAS` takes one host name.",
 				ElementType:         types.StringType,
 				Required:            true,
 				Validators: []validator.List{
