@@ -10,7 +10,7 @@ import (
 )
 
 // PollInterval is slower than the CLI's 3s: a single apply can wait on several
-// resources at once, all inside the ingress's 100 requests a minute.
+// resources at once, all inside the api's 100 requests a minute.
 var PollInterval = 5 * time.Second
 
 // Poll calls check every PollInterval until it says done or ctx ends. ctx

@@ -2,7 +2,7 @@ package client
 
 import "time"
 
-// The shapes the provider sends and reads, the v1 subset of cli/internal/api/types.go.
+// The shapes the provider sends and reads, the subset of the api it manages.
 
 type Whoami struct {
 	Account struct {

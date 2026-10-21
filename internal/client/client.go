@@ -1,8 +1,5 @@
 // Package client talks to the Cloider api, https://cloider.com/api, as an API
-// token. It is the CLI's cli/internal/api cut down to what the provider manages,
-// a copy because Go doesn't let another module import a package under internal/.
-// The shapes mirror web/composables/api/**, so an api change lands in the web,
-// the CLI and here together.
+// token. It is the cloider CLI's api client cut down to what the provider manages.
 package client
 
 import (
@@ -34,7 +31,7 @@ type Client struct {
 func New(baseURL, token, userAgent string, insecure bool) *Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if insecure {
-		// Only for local dev's self signed https://localhost, behind CLOIDER_INSECURE
+		// Only for a local api with a self signed certificate, behind CLOIDER_INSECURE
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
@@ -43,15 +40,14 @@ func New(baseURL, token, userAgent string, insecure bool) *Client {
 		token:     token,
 		userAgent: userAgent,
 		http:      &http.Client{Transport: transport, Timeout: 2 * time.Minute},
-		// The ingress allows 10 requests a second and 100 a minute per client. A plan
+		// The api allows 10 requests a second and 100 a minute per client. A plan
 		// refreshes every resource at once and waits poll, so this stays under it
 		// instead of leaning on the 429 retries.
 		limiter: rate.NewLimiter(rate.Limit(1.5), 10),
 	}
 }
 
-// The ingress says it is rate limiting with a 429 or, as ingress-nginx does by
-// default, a 503.
+// The api answers a rate limited request with a 429, or with a 503.
 const maxAttempts = 4
 
 func (c *Client) newRequest(ctx context.Context, method, path string, query url.Values, body any) (*http.Request, error) {

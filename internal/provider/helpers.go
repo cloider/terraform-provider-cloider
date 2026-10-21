@@ -70,11 +70,11 @@ func addAPIError(diags *diag.Diagnostics, summary string, err error) {
 }
 
 // addCreateError is addAPIError for a create, which the api may have done after
-// the ingress gave up waiting for it, 10s in. Terraform doesn't know it then.
+// the request timed out. Terraform doesn't know it then.
 func addCreateError(diags *diag.Diagnostics, summary string, err error) {
 	detail := err.Error()
 	if client.MayHaveGoneThrough(err) {
-		detail += "\n\nThe api may have created it anyway after the ingress gave up waiting, check the dashboard for one to import or delete."
+		detail += "\n\nThe request timed out, but the api may have created it anyway. Check the dashboard for one to import or delete."
 	}
 	diags.AddError(summary, detail)
 }
@@ -165,12 +165,12 @@ func deleteAndWait(ctx context.Context, c *client.Client, basePath, what string,
 	}
 }
 
-// adoptWait is how long a create the ingress gave up on may still take: the api
-// gives the resource service 3 minutes for a bucket or registry project.
+// adoptWait is how long a create that timed out may still take: the api gives
+// itself 3 minutes for a bucket or registry project.
 const adoptWait = 4 * time.Minute
 
-// adoptAfterTimeout finds what a create made after the ingress stopped waiting
-// for it, 10s in. Buckets and registry projects are created while the api
+// adoptAfterTimeout finds what a create made after its request timed out.
+// Buckets and registry projects are created while the api
 // answers, and their names are their own across all accounts, so the one of
 // that name in the list is the one the create made.
 func adoptAfterTimeout[T any](ctx context.Context, c *client.Client, listPath string, match func(T) bool, idAndStatus func(T) (string, string)) (string, error) {
@@ -198,7 +198,7 @@ func adoptAfterTimeout[T any](ctx context.Context, c *client.Client, listPath st
 		return status, false, nil
 	})
 	if err != nil && ctx.Err() != nil {
-		return "", fmt.Errorf("the ingress gave up on the create 10s in, and it didn't show up in the %s after", adoptWait)
+		return "", fmt.Errorf("the create request timed out, and it didn't show up in the %s after", adoptWait)
 	}
 	return id, err
 }

@@ -34,7 +34,7 @@ var (
 	_ resource.ResourceWithModifyPlan  = &databaseResource{}
 )
 
-// databaseEngines is the CLI's --engine names for the api's services.
+// databaseEngines maps the CLI's --engine names to the api's engine names.
 var databaseEngines = map[string]string{
 	"postgresql": "PostgreSQL",
 	"mysql":      "MySQL",
@@ -491,8 +491,7 @@ func (r *databaseResource) read(ctx context.Context, m *databaseModel) (bool, er
 	}
 	m.CreatedAt = timeString(db.CreatedAt)
 
-	// Each of these reads the database's secrets on its host cluster, and neither
-	// changes on its own, so only what state doesn't have yet is fetched
+	// Each of these is a separate request, and neither changes on its own, so only what state doesn't have yet is fetched
 	query := url.Values{"id": {id}}
 	if m.Password.IsNull() || m.Password.IsUnknown() {
 		password, err := r.client.GetText(ctx, "/database/password", query)

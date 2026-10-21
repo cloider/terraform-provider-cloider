@@ -30,7 +30,7 @@ func parseError(status int, body []byte) *Error {
 		return e
 	}
 
-	// Not the api's shape: the ingress, a bare status, or plain text like the
+	// Not the api's shape: a rate limit or timeout page, a bare status, or plain text like the
 	// "Not Found" of a resource that isn't the account's
 	message := strings.TrimSpace(string(body))
 	if message == "" || strings.HasPrefix(message, "<") {
@@ -73,8 +73,8 @@ func StatusOf(err error) int {
 
 func IsNotFound(err error) bool { return StatusOf(err) == http.StatusNotFound }
 
-// MayHaveGoneThrough is a write the ingress gave up on, 10s in, while the api
-// carried on with it.
+// MayHaveGoneThrough is a write that timed out before the api answered, which
+// the api may still have carried out.
 func MayHaveGoneThrough(err error) bool {
 	status := StatusOf(err)
 	return status == http.StatusBadGateway || status == http.StatusGatewayTimeout

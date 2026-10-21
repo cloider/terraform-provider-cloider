@@ -1,6 +1,5 @@
-# Releases the provider when GitLab pushes a v<version> tag to this mirror, see
-# .gitlab/release-terraform.sh in gitlab.com/cloider/services. The Terraform
-# Registry picks the release up from its webhook.
+# Releases the provider when a v<version> tag is pushed. The Terraform Registry
+# picks the release up from its webhook.
 name: Release
 
 on:

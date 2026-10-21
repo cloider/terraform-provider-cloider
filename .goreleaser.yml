@@ -1,6 +1,6 @@
-# Run by .github/workflows/release.yml in the GitHub mirror, on the v<version>
-# tag .gitlab/release-terraform.sh pushes there. The Terraform Registry reads the
-# zips, SHA256SUMS, its signature and the manifest off the GitHub release.
+# Run by .github/workflows/release.yml on a v<version> tag. The Terraform
+# Registry reads the zips, SHA256SUMS, its signature and the manifest off the
+# GitHub release.
 version: 2
 builds:
   - env:

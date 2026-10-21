@@ -28,7 +28,7 @@ var (
 	_ resource.ResourceWithConfigValidators = &targetResource{}
 )
 
-// targetPath is what the api allows, since paths end up in an nginx regex
+// targetPath is what the api allows in a path
 var targetPath = regexp.MustCompile(`^/[A-Za-z0-9/_.-]*$`)
 
 type targetResource struct {

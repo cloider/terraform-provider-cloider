@@ -33,7 +33,6 @@ type Session struct {
 }
 
 // The CLI's ~/.cloider/config.json, only what finding a profile's token needs.
-// It mirrors cli/internal/config/config.go.
 type cliConfig struct {
 	CurrentProfile string `json:"current_profile"`
 	Profiles       map[string]struct {
