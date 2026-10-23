@@ -2,14 +2,15 @@
 page_title: "cloider_target Resource - cloider"
 subcategory: "Domains and Routing"
 description: |-
-  Routes a path of a domain to a Service in a Cloider cluster, or to an app.
+  Routes a path of a domain to a Service in a Cloider cluster, to an app, or to a bucket's static website.
 ---
 
 # Resource: cloider_target
 
 Routes a path of a [`cloider_domain`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain)
 to a Service in a [`cloider_cluster`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/cluster),
-or to an app. Cloider serves the domain over HTTPS with a certificate of its own and passes requests on
+to an app, or to a [`cloider_bucket`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/bucket)'s
+static website. Cloider serves the domain over HTTPS with a certificate of its own and passes requests on
 to the Service's port as plain HTTP.
 
 This is how a cluster's Services are reached from the internet: Ingress objects inside a cluster
@@ -39,6 +40,12 @@ so `/` catches whatever no longer path does.
 ### Routing to an App
 
 {{ tffile "examples/resources/cloider_target/app.tf" }}
+
+### Serving a Bucket's Website
+
+The bucket's `website` has to be on. A website takes the whole domain, so `path` stays `/`.
+
+{{ tffile "examples/resources/cloider_target/bucket.tf" }}
 
 {{ .SchemaMarkdown | trimspace }}
 

@@ -347,6 +347,36 @@ resource "cloider_target" "web" {
 				},
 			},
 			{
+				// A bucket website takes the whole domain
+				Config: config(`
+  bucket_id = "b4c5d6"
+`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("cloider_target.web", plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("bucket_id"), knownvalue.StringExact("b4c5d6")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("app_id"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("path"), knownvalue.StringExact("/")),
+				},
+			},
+			{
+				Config: config(`
+  path      = "/docs"
+  bucket_id = "b4c5d6"
+`),
+				ExpectError: regexp.MustCompile(`root\s+of\s+its\s+domain`),
+			},
+			{
+				Config: config(`
+  app_id    = "a1b2c3"
+  bucket_id = "b4c5d6"
+`),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
+				// Last: the destroy after the steps validates this config, and only
+				// an unknown cluster_id lets an invalid combination through there
 				Config: config(`
   app_id     = "a1b2c3"
   cluster_id = cloider_cluster.web.id

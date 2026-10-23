@@ -50,6 +50,7 @@ type targetModel struct {
 	Port       types.Int64  `tfsdk:"port"`
 	Protocol   types.String `tfsdk:"protocol"`
 	AppID      types.String `tfsdk:"app_id"`
+	BucketID   types.String `tfsdk:"bucket_id"`
 	CreatedAt  types.String `tfsdk:"created_at"`
 }
 
@@ -64,7 +65,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, or to an app, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served.",
+		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, to an app, or to a `cloider_bucket`'s static website, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The target's id.",
@@ -91,7 +92,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.String{targetPathDefault{}},
 			},
 			"cluster_id": schema.StringAttribute{
-				MarkdownDescription: "The id of the `cloider_cluster` whose Service to route to. Set this, with `namespace`, `service` and `port`, or `app_id`.",
+				MarkdownDescription: "The id of the `cloider_cluster` whose Service to route to. Set this, with `namespace`, `service` and `port`, or `app_id`, or `bucket_id`.",
 				Optional:            true,
 				Validators: []validator.String{
 					stringvalidator.AlsoRequires(path.MatchRoot("namespace"), path.MatchRoot("service"), path.MatchRoot("port")),
@@ -121,12 +122,16 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("TCP", "UDP"),
-					stringvalidator.ConflictsWith(path.MatchRoot("app_id")),
+					stringvalidator.ConflictsWith(path.MatchRoot("app_id"), path.MatchRoot("bucket_id")),
 				},
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"app_id": schema.StringAttribute{
-				MarkdownDescription: "The id of the app to route to, see `cloider app list -o wide`. Set this or `cluster_id`. An app has to be deployed before it can be routed to.",
+				MarkdownDescription: "The id of the app to route to, see `cloider app list -o wide`. Set this, `bucket_id` or `cluster_id`. An app has to be deployed before it can be routed to.",
+				Optional:            true,
+			},
+			"bucket_id": schema.StringAttribute{
+				MarkdownDescription: "The id of the `cloider_bucket` whose static website to serve. Set this, `app_id` or `cluster_id`. A website takes the whole domain, so `path` and `target_path` stay `/`, and the bucket's `website` has to be on.",
 				Optional:            true,
 			},
 			"created_at": schema.StringAttribute{
@@ -140,7 +145,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 
 func (r *targetResource) ConfigValidators(context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{
-		resourcevalidator.ExactlyOneOf(path.MatchRoot("cluster_id"), path.MatchRoot("app_id")),
+		resourcevalidator.ExactlyOneOf(path.MatchRoot("cluster_id"), path.MatchRoot("app_id"), path.MatchRoot("bucket_id")),
 	}
 }
 
@@ -174,6 +179,11 @@ func (r *targetResource) form(ctx context.Context, m targetModel) (client.Target
 	if !m.AppID.IsNull() {
 		form.TargetType = "App"
 		form.AppId = m.AppID.ValueString()
+		return form, nil
+	}
+	if !m.BucketID.IsNull() {
+		form.TargetType = "Bucket"
+		form.BucketId = m.BucketID.ValueString()
 		return form, nil
 	}
 
@@ -322,13 +332,19 @@ func fillTarget(m *targetModel, t client.Target) {
 	m.Protocol = stringOrNull(t.Protocol)
 	m.CreatedAt = timeString(t.CreatedAt)
 
-	// An app target's routing comes from the app, so only a cluster target has it
-	if t.TargetType == "App" {
-		m.AppID = types.StringValue(t.AppId)
+	// An app or bucket target's routing comes from the app or the website
+	// service, so only a cluster target has it
+	switch t.TargetType {
+	case "App":
+		m.AppID, m.BucketID = types.StringValue(t.AppId), types.StringNull()
+		m.ClusterID, m.Namespace, m.Service, m.Port = types.StringNull(), types.StringNull(), types.StringNull(), types.Int64Null()
+		return
+	case "Bucket":
+		m.AppID, m.BucketID = types.StringNull(), types.StringValue(t.BucketId)
 		m.ClusterID, m.Namespace, m.Service, m.Port = types.StringNull(), types.StringNull(), types.StringNull(), types.Int64Null()
 		return
 	}
-	m.AppID = types.StringNull()
+	m.AppID, m.BucketID = types.StringNull(), types.StringNull()
 	m.ClusterID = types.StringValue(t.ClusterId)
 	m.Namespace = types.StringValue(t.Namespace)
 	m.Service = types.StringValue(t.Service)

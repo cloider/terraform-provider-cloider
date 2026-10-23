@@ -96,14 +96,25 @@ type BucketRegion struct {
 }
 
 type Bucket struct {
-	HashedId   string    `json:"hashed_id"`
-	BucketName string    `json:"bucket_name"`
-	Region     string    `json:"region"`
-	Public     bool      `json:"public"`
-	Status     string    `json:"status"`
-	Endpoint   string    `json:"endpoint"`
-	URL        string    `json:"url"`
-	CreatedAt  time.Time `json:"created_at"`
+	HashedId     string    `json:"hashed_id"`
+	BucketName   string    `json:"bucket_name"`
+	Region       string    `json:"region"`
+	Public       bool      `json:"public"`
+	Status       string    `json:"status"`
+	Endpoint     string    `json:"endpoint"`
+	URL          string    `json:"url"`
+	Website      bool      `json:"website"`
+	WebsiteIndex string    `json:"website_index"`
+	WebsiteError string    `json:"website_error"`
+	WebsiteURL   string    `json:"website_url"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// BucketWebsiteForm is the body of PUT /buckets/<id>/website.
+type BucketWebsiteForm struct {
+	Enabled       bool   `json:"enabled"`
+	IndexDocument string `json:"index_document"`
+	ErrorDocument string `json:"error_document"`
 }
 
 // BucketVersioning is "", Enabled or Suspended: once on, versioning can only be suspended.
@@ -208,9 +219,9 @@ type DnsRecordForm struct {
 	Ttl         int    `json:"ttl"`
 }
 
-// Targets route a path of a domain to a cluster service or an app. Cluster
-// targets carry the cluster's id and routing fields, app targets only app_id:
-// the api fills in the rest from the app.
+// Targets route a path of a domain to a cluster service, an app or a bucket's
+// website. Cluster targets carry the cluster's id and routing fields, app and
+// bucket targets only app_id or bucket_id: the api fills in the rest.
 type Target struct {
 	HashedId    string    `json:"hashed_id"`
 	DomainName  string    `json:"domain_name"`
@@ -218,6 +229,7 @@ type Target struct {
 	ClusterId   string    `json:"cluster_id"`
 	ClusterName string    `json:"cluster_name"`
 	AppId       string    `json:"app_id"`
+	BucketId    string    `json:"bucket_id"`
 	Namespace   string    `json:"namespace"`
 	Service     string    `json:"service"`
 	Port        int       `json:"port"`
@@ -239,4 +251,5 @@ type TargetForm struct {
 	Port        int    `json:"port,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
 	AppId       string `json:"app_id,omitempty"`
+	BucketId    string `json:"bucket_id,omitempty"`
 }

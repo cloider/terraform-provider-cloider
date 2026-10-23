@@ -15,7 +15,7 @@ import (
 )
 
 // fakeAPI answers the routes the cluster, database, domain, DNS record and
-// target resources use, the way the api does, quirks included: lists that hide
+// target resources use (bucket targets without the buckets themselves), the way the api does, quirks included: lists that hide
 // Terminated rows, GET by id that still shows them, plain text 404s. Everything
 // settles at once, so waits return on their first poll.
 type fakeAPI struct {
@@ -287,13 +287,23 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if form.TargetPath == "" {
 			form.TargetPath = form.Path
 		}
+		if form.TargetType == "Bucket" && (form.Path != "/" || form.TargetPath != "/") {
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]any{"errors": map[string][]string{"path": {"A bucket website is served at the root of its domain, the path must be /"}}})
+			return
+		}
 		t.DomainName, t.TargetType, t.Path, t.TargetPath = form.DomainName, form.TargetType, form.Path, form.TargetPath
-		if form.TargetType == "App" {
+		switch form.TargetType {
+		case "App":
 			// The api routes an app target from the app itself
-			t.AppId, t.ClusterId, t.ClusterName = form.AppId, "", ""
+			t.AppId, t.BucketId, t.ClusterId, t.ClusterName = form.AppId, "", "", ""
 			t.Namespace, t.Service, t.Port, t.Protocol = "app-web-"+form.AppId, "app", 8080, "TCP"
-		} else {
-			t.AppId, t.ClusterId, t.ClusterName = "", form.ClusterId, form.ClusterName
+		case "Bucket":
+			// and a bucket target to the website service, which serves the bucket
+			t.AppId, t.BucketId, t.ClusterId, t.ClusterName = "", form.BucketId, "", ""
+			t.Namespace, t.Service, t.Port, t.Protocol = "", "", 8006, "TCP"
+		default:
+			t.AppId, t.BucketId, t.ClusterId, t.ClusterName = "", "", form.ClusterId, form.ClusterName
 			t.Namespace, t.Service, t.Port, t.Protocol = form.Namespace, form.Service, form.Port, form.Protocol
 		}
 		f.targets[t.HashedId] = t

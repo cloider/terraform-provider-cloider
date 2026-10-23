@@ -53,6 +53,29 @@ resource "cloider_bucket" "backups" {
 }
 ```
 
+### Static Website
+
+Serve it on a domain of your own with a
+[`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target)
+and `bucket_id`.
+
+```terraform
+# Served as a static website at website_url: / and every path ending in a
+# slash get index.html, anything missing gets 404.html with a 404. The website
+# is read without a key, so the bucket has to be public.
+resource "cloider_bucket" "site" {
+  name           = "acme-site"
+  public         = true
+  website        = true
+  index_document = "index.html"
+  error_document = "404.html"
+}
+
+output "site_url" {
+  value = cloider_bucket.site.website_url
+}
+```
+
 ### Bucket with an Access Key
 
 ```terraform
@@ -113,10 +136,13 @@ resource "cloider_bucket" "uploads" {
 
 ### Optional
 
+- `error_document` (String) The key the website serves, with a 404, for anything missing. Defaults to `""`, a built-in page.
+- `index_document` (String) The file the website serves for a path ending in a slash, a name without a slash. Defaults to `index.html`.
 - `public` (Boolean) Whether anyone may read the bucket's files without a key. Defaults to `false`.
 - `region` (String) The region code, see `cloider_bucket_regions`. Defaults to the first region. Changing it replaces the bucket.
 - `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 - `versioning` (Boolean) Whether the bucket keeps previous versions of its files. Versioning that was on can only be suspended, so `false` after `true` keeps the versions already kept. Defaults to `false`.
+- `website` (Boolean) Whether the bucket is served as a static website at `website_url`, and on the domains a `cloider_target` with `bucket_id` routes to it. The website is read without a key, so it needs `public`. Defaults to `false`.
 
 ### Read-Only
 
@@ -125,6 +151,7 @@ resource "cloider_bucket" "uploads" {
 - `id` (String) The bucket's id.
 - `status` (String) `Ready`, `Failed` or `Terminating`.
 - `url` (String) The bucket's url, where a public bucket's files are read.
+- `website_url` (String) The website's own address, `https://<name>.s3-website.<region>.<domain>`, while `website` is on.
 
 <a id="nestedatt--timeouts"></a>
 ### Nested Schema for `timeouts`

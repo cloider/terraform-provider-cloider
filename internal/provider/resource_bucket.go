@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -28,16 +29,20 @@ func NewBucketResource() resource.Resource {
 }
 
 type bucketModel struct {
-	ID         types.String   `tfsdk:"id"`
-	Name       types.String   `tfsdk:"name"`
-	Region     types.String   `tfsdk:"region"`
-	Public     types.Bool     `tfsdk:"public"`
-	Versioning types.Bool     `tfsdk:"versioning"`
-	Status     types.String   `tfsdk:"status"`
-	Endpoint   types.String   `tfsdk:"endpoint"`
-	URL        types.String   `tfsdk:"url"`
-	CreatedAt  types.String   `tfsdk:"created_at"`
-	Timeouts   timeouts.Value `tfsdk:"timeouts"`
+	ID            types.String   `tfsdk:"id"`
+	Name          types.String   `tfsdk:"name"`
+	Region        types.String   `tfsdk:"region"`
+	Public        types.Bool     `tfsdk:"public"`
+	Versioning    types.Bool     `tfsdk:"versioning"`
+	Website       types.Bool     `tfsdk:"website"`
+	IndexDocument types.String   `tfsdk:"index_document"`
+	ErrorDocument types.String   `tfsdk:"error_document"`
+	Status        types.String   `tfsdk:"status"`
+	Endpoint      types.String   `tfsdk:"endpoint"`
+	URL           types.String   `tfsdk:"url"`
+	WebsiteURL    types.String   `tfsdk:"website_url"`
+	CreatedAt     types.String   `tfsdk:"created_at"`
+	Timeouts      timeouts.Value `tfsdk:"timeouts"`
 }
 
 func (r *bucketResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -76,12 +81,34 @@ func (r *bucketResource) Schema(ctx context.Context, _ resource.SchemaRequest, r
 				Computed:            true,
 				Default:             booldefault.StaticBool(false),
 			},
+			"website": schema.BoolAttribute{
+				MarkdownDescription: "Whether the bucket is served as a static website at `website_url`, and on the domains a `cloider_target` with `bucket_id` routes to it. The website is read without a key, so it needs `public`. Defaults to `false`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+			},
+			"index_document": schema.StringAttribute{
+				MarkdownDescription: "The file the website serves for a path ending in a slash, a name without a slash. Defaults to `index.html`.",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString("index.html"),
+			},
+			"error_document": schema.StringAttribute{
+				MarkdownDescription: "The key the website serves, with a 404, for anything missing. Defaults to `\"\"`, a built-in page.",
+				Optional:            true,
+				Computed:            true,
+				Default:             stringdefault.StaticString(""),
+			},
 			"status": schema.StringAttribute{
 				MarkdownDescription: "`Ready`, `Failed` or `Terminating`.",
 				Computed:            true,
 			},
-			"endpoint":   computedString("The S3 endpoint of the bucket's region."),
-			"url":        computedString("The bucket's url, where a public bucket's files are read."),
+			"endpoint": computedString("The S3 endpoint of the bucket's region."),
+			"url":      computedString("The bucket's url, where a public bucket's files are read."),
+			"website_url": schema.StringAttribute{
+				MarkdownDescription: "The website's own address, `https://<name>.s3-website.<region>.<domain>`, while `website` is on.",
+				Computed:            true,
+			},
 			"created_at": computedString("When the bucket was created, RFC 3339."),
 			"timeouts":   timeouts.Attributes(ctx, timeouts.Opts{Create: true, Delete: true}),
 		},
@@ -117,7 +144,7 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	name := plan.Name.ValueString()
-	body := map[string]any{"bucket_name": name, "region": region, "public": plan.Public.ValueBool(), "versioning": plan.Versioning.ValueBool()}
+	body := map[string]any{"bucket_name": name, "region": region, "public": plan.Public.ValueBool(), "versioning": plan.Versioning.ValueBool(), "website": plan.Website.ValueBool()}
 	var created client.Created
 	err := r.client.Post(ctx, "/buckets", body, &created)
 	if client.MayHaveGoneThrough(err) {
@@ -131,12 +158,29 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	plan.ID = types.StringValue(created.HashedId)
+	// The create takes website alone, the documents start as the defaults
+	if plan.IndexDocument.ValueString() != "index.html" || plan.ErrorDocument.ValueString() != "" {
+		if err := r.putWebsite(ctx, plan); err != nil {
+			// The new bucket still goes into the state, tainted, rather than left behind
+			addAPIError(&resp.Diagnostics, "Can't set the website of bucket "+name, err)
+		}
+	}
+
 	found, err := r.read(ctx, &plan)
 	if err != nil || !found {
 		resp.Diagnostics.AddError("Can't read the bucket back", errOrGone(err))
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, plan)...)
+}
+
+func (r *bucketResource) putWebsite(ctx context.Context, m bucketModel) error {
+	form := client.BucketWebsiteForm{
+		Enabled:       m.Website.ValueBool(),
+		IndexDocument: m.IndexDocument.ValueString(),
+		ErrorDocument: m.ErrorDocument.ValueString(),
+	}
+	return r.client.Put(ctx, "/buckets/"+m.ID.ValueString()+"/website", form, nil)
 }
 
 func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -167,12 +211,32 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	basePath := "/buckets/" + state.ID.ValueString()
+	plan.ID = state.ID
+
+	// The website needs the bucket public: it goes off before the bucket turns
+	// private, and on after it turns public.
+	websiteChanged := !plan.Website.Equal(state.Website) || !plan.IndexDocument.Equal(state.IndexDocument) || !plan.ErrorDocument.Equal(state.ErrorDocument)
+	websiteFirst := websiteChanged && !plan.Website.ValueBool()
+	setWebsite := func() bool {
+		if err := r.putWebsite(ctx, plan); err != nil {
+			addAPIError(&resp.Diagnostics, "Can't change the website of bucket "+state.Name.ValueString(), err)
+			return false
+		}
+		return true
+	}
+
 	// One at a time: a bucket takes one settings change at once
+	if websiteFirst && !setWebsite() {
+		return
+	}
 	if !plan.Public.Equal(state.Public) {
 		if err := r.client.Put(ctx, basePath+"/visibility", map[string]bool{"public": plan.Public.ValueBool()}, nil); err != nil {
 			addAPIError(&resp.Diagnostics, "Can't change the visibility of bucket "+state.Name.ValueString(), err)
 			return
 		}
+	}
+	if websiteChanged && !websiteFirst && !setWebsite() {
+		return
 	}
 	if !plan.Versioning.Equal(state.Versioning) {
 		if err := r.client.Put(ctx, basePath+"/versioning", map[string]bool{"enabled": plan.Versioning.ValueBool()}, nil); err != nil {
@@ -181,7 +245,6 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	plan.ID = state.ID
 	found, err := r.read(ctx, &plan)
 	if err != nil || !found {
 		resp.Diagnostics.AddError("Can't read the bucket back", errOrGone(err))
@@ -235,9 +298,13 @@ func (r *bucketResource) read(ctx context.Context, m *bucketModel) (bool, error)
 	m.Region = types.StringValue(b.Region)
 	m.Public = types.BoolValue(b.Public)
 	m.Versioning = types.BoolValue(versioning.Status == "Enabled")
+	m.Website = types.BoolValue(b.Website)
+	m.IndexDocument = types.StringValue(b.WebsiteIndex)
+	m.ErrorDocument = types.StringValue(b.WebsiteError)
 	m.Status = types.StringValue(b.Status)
 	m.Endpoint = stringOrNull(b.Endpoint)
 	m.URL = stringOrNull(b.URL)
+	m.WebsiteURL = stringOrNull(b.WebsiteURL)
 	m.CreatedAt = timeString(b.CreatedAt)
 	return true, nil
 }

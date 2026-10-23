@@ -30,6 +30,14 @@ has. Changing `name` or `region` replaces the bucket.
 
 {{ tffile "examples/resources/cloider_bucket/versioning.tf" }}
 
+### Static Website
+
+Serve it on a domain of your own with a
+[`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target)
+and `bucket_id`.
+
+{{ tffile "examples/resources/cloider_bucket/website.tf" }}
+
 ### Bucket with an Access Key
 
 {{ tffile "examples/resources/cloider_bucket/with-key.tf" }}
