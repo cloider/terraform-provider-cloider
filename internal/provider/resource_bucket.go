@@ -2,9 +2,15 @@ package provider
 
 import (
 	"context"
+	"regexp"
+	"slices"
 
 	"github.com/cloider/terraform-provider-cloider/internal/client"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -29,21 +36,44 @@ func NewBucketResource() resource.Resource {
 }
 
 type bucketModel struct {
-	ID            types.String   `tfsdk:"id"`
-	Name          types.String   `tfsdk:"name"`
-	Region        types.String   `tfsdk:"region"`
-	Public        types.Bool     `tfsdk:"public"`
-	Versioning    types.Bool     `tfsdk:"versioning"`
-	Website       types.Bool     `tfsdk:"website"`
-	IndexDocument types.String   `tfsdk:"index_document"`
-	ErrorDocument types.String   `tfsdk:"error_document"`
-	Status        types.String   `tfsdk:"status"`
-	Endpoint      types.String   `tfsdk:"endpoint"`
-	URL           types.String   `tfsdk:"url"`
-	WebsiteURL    types.String   `tfsdk:"website_url"`
-	CreatedAt     types.String   `tfsdk:"created_at"`
-	Timeouts      timeouts.Value `tfsdk:"timeouts"`
+	ID            types.String    `tfsdk:"id"`
+	Name          types.String    `tfsdk:"name"`
+	Region        types.String    `tfsdk:"region"`
+	Public        types.Bool      `tfsdk:"public"`
+	Versioning    types.Bool      `tfsdk:"versioning"`
+	Website       types.Bool      `tfsdk:"website"`
+	IndexDocument types.String    `tfsdk:"index_document"`
+	ErrorDocument types.String    `tfsdk:"error_document"`
+	CorsRules     []corsRuleModel `tfsdk:"cors_rule"`
+	Status        types.String    `tfsdk:"status"`
+	Endpoint      types.String    `tfsdk:"endpoint"`
+	URL           types.String    `tfsdk:"url"`
+	WebsiteURL    types.String    `tfsdk:"website_url"`
+	CreatedAt     types.String    `tfsdk:"created_at"`
+	Timeouts      timeouts.Value  `tfsdk:"timeouts"`
 }
+
+type corsRuleModel struct {
+	ID             types.String `tfsdk:"id"`
+	AllowedOrigins types.List   `tfsdk:"allowed_origins"`
+	AllowedMethods types.List   `tfsdk:"allowed_methods"`
+	AllowedHeaders types.List   `tfsdk:"allowed_headers"`
+	ExposeHeaders  types.List   `tfsdk:"expose_headers"`
+	MaxAgeSeconds  types.Int64  `tfsdk:"max_age_seconds"`
+}
+
+func (a corsRuleModel) equal(b corsRuleModel) bool {
+	return a.ID.Equal(b.ID) && a.AllowedOrigins.Equal(b.AllowedOrigins) && a.AllowedMethods.Equal(b.AllowedMethods) &&
+		a.AllowedHeaders.Equal(b.AllowedHeaders) && a.ExposeHeaders.Equal(b.ExposeHeaders) && a.MaxAgeSeconds.Equal(b.MaxAgeSeconds)
+}
+
+// The api lowercases origins and uppercases methods, so only those spellings
+// read back as written.
+var (
+	corsOrigin        = regexp.MustCompile(`^(\*|[a-z][a-z0-9+.-]*://[^A-Z/?#\s]+)$`)
+	corsHeader        = regexp.MustCompile("^[A-Za-z0-9!#$%&'+.^_`|~-]+$")
+	corsAllowedHeader = regexp.MustCompile("^[A-Za-z0-9!#$%&'+.^_`|~-]+\\*?$")
+)
 
 func (r *bucketResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_bucket"
@@ -112,6 +142,68 @@ func (r *bucketResource) Schema(ctx context.Context, _ resource.SchemaRequest, r
 			"created_at": computedString("When the bucket was created, RFC 3339."),
 			"timeouts":   timeouts.Attributes(ctx, timeouts.Opts{Create: true, Delete: true}),
 		},
+		Blocks: map[string]schema.Block{
+			"cors_rule": schema.ListNestedBlock{
+				MarkdownDescription: "The websites that can use the bucket from a browser. Without `cors_rule` blocks any website can. With them only the origins they list can, and the Cloider dashboard always can. The first rule whose origin matches answers a preflight.",
+				Validators:          []validator.List{listvalidator.SizeAtMost(99)},
+				NestedObject: schema.NestedBlockObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							MarkdownDescription: "A name for the rule.",
+							Optional:            true,
+							Validators:          []validator.String{stringvalidator.LengthBetween(1, 255)},
+						},
+						"allowed_origins": schema.ListAttribute{
+							MarkdownDescription: "Origins as browsers send them, in lower case and without a path, like `https://app.example.com`. `https://*.example.com` matches its subdomains, `*` any website.",
+							ElementType:         types.StringType,
+							Required:            true,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+								listvalidator.ValueStringsAre(stringvalidator.RegexMatches(corsOrigin, "must be \"*\" or a lower case origin like https://app.example.com, without a path")),
+							},
+						},
+						"allowed_methods": schema.ListAttribute{
+							MarkdownDescription: "Any of `GET`, `HEAD`, `PUT`, `POST` and `DELETE`.",
+							ElementType:         types.StringType,
+							Required:            true,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+								listvalidator.ValueStringsAre(stringvalidator.OneOf("GET", "HEAD", "PUT", "POST", "DELETE")),
+							},
+						},
+						"allowed_headers": schema.ListAttribute{
+							MarkdownDescription: "Request headers a page may send, like `Content-Type`. `*` for any, or a prefix like `x-amz-*`.",
+							ElementType:         types.StringType,
+							Optional:            true,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+								listvalidator.ValueStringsAre(stringvalidator.Any(
+									stringvalidator.OneOf("*"),
+									stringvalidator.RegexMatches(corsAllowedHeader, "must be a header name, with a * only at its end"),
+								)),
+							},
+						},
+						"expose_headers": schema.ListAttribute{
+							MarkdownDescription: "Response headers a page's script can read, like `ETag`.",
+							ElementType:         types.StringType,
+							Optional:            true,
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
+								listvalidator.ValueStringsAre(stringvalidator.Any(
+									stringvalidator.OneOf("*"),
+									stringvalidator.RegexMatches(corsHeader, "must be a header name"),
+								)),
+							},
+						},
+						"max_age_seconds": schema.Int64Attribute{
+							MarkdownDescription: "How long browsers may reuse a preflight answer, 1 to 86400. Leave it out for their default.",
+							Optional:            true,
+							Validators:          []validator.Int64{int64validator.Between(1, 86400)},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -165,6 +257,9 @@ func (r *bucketResource) Create(ctx context.Context, req resource.CreateRequest,
 			addAPIError(&resp.Diagnostics, "Can't set the website of bucket "+name, err)
 		}
 	}
+	if len(plan.CorsRules) > 0 {
+		resp.Diagnostics.Append(r.putCors(ctx, plan)...)
+	}
 
 	found, err := r.read(ctx, &plan)
 	if err != nil || !found {
@@ -181,6 +276,35 @@ func (r *bucketResource) putWebsite(ctx context.Context, m bucketModel) error {
 		ErrorDocument: m.ErrorDocument.ValueString(),
 	}
 	return r.client.Put(ctx, "/buckets/"+m.ID.ValueString()+"/website", form, nil)
+}
+
+func (r *bucketResource) putCors(ctx context.Context, m bucketModel) diag.Diagnostics {
+	var diags diag.Diagnostics
+	rules := make([]client.BucketCorsRule, len(m.CorsRules))
+	for i, rule := range m.CorsRules {
+		rules[i] = client.BucketCorsRule{ID: rule.ID.ValueString(), MaxAgeSeconds: rule.MaxAgeSeconds.ValueInt64()}
+		for _, list := range []struct {
+			from types.List
+			to   *[]string
+		}{
+			{rule.AllowedOrigins, &rules[i].AllowedOrigins},
+			{rule.AllowedMethods, &rules[i].AllowedMethods},
+			{rule.AllowedHeaders, &rules[i].AllowedHeaders},
+			{rule.ExposeHeaders, &rules[i].ExposeHeaders},
+		} {
+			values, d := stringsOfList(ctx, list.from)
+			diags.Append(d...)
+			*list.to = values
+		}
+	}
+	if diags.HasError() {
+		return diags
+	}
+
+	if err := r.client.Put(ctx, "/buckets/"+m.ID.ValueString()+"/cors", client.BucketCors{Rules: rules}, nil); err != nil {
+		addAPIError(&diags, "Can't set the CORS rules of bucket "+m.Name.ValueString(), err)
+	}
+	return diags
 }
 
 func (r *bucketResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -244,6 +368,12 @@ func (r *bucketResource) Update(ctx context.Context, req resource.UpdateRequest,
 			return
 		}
 	}
+	if !slices.EqualFunc(plan.CorsRules, state.CorsRules, corsRuleModel.equal) {
+		resp.Diagnostics.Append(r.putCors(ctx, plan)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
 
 	found, err := r.read(ctx, &plan)
 	if err != nil || !found {
@@ -293,6 +423,10 @@ func (r *bucketResource) read(ctx context.Context, m *bucketModel) (bool, error)
 	if err := r.client.Get(ctx, basePath+"/versioning", nil, &versioning); err != nil {
 		return false, err
 	}
+	var cors client.BucketCors
+	if err := r.client.Get(ctx, basePath+"/cors", nil, &cors); err != nil {
+		return false, err
+	}
 
 	m.Name = types.StringValue(b.BucketName)
 	m.Region = types.StringValue(b.Region)
@@ -301,6 +435,21 @@ func (r *bucketResource) read(ctx context.Context, m *bucketModel) (bool, error)
 	m.Website = types.BoolValue(b.Website)
 	m.IndexDocument = types.StringValue(b.WebsiteIndex)
 	m.ErrorDocument = types.StringValue(b.WebsiteError)
+	m.CorsRules = make([]corsRuleModel, len(cors.Rules))
+	for i, rule := range cors.Rules {
+		maxAge := types.Int64Null()
+		if rule.MaxAgeSeconds > 0 {
+			maxAge = types.Int64Value(rule.MaxAgeSeconds)
+		}
+		m.CorsRules[i] = corsRuleModel{
+			ID:             stringOrNull(rule.ID),
+			AllowedOrigins: listOrNull(rule.AllowedOrigins),
+			AllowedMethods: listOrNull(rule.AllowedMethods),
+			AllowedHeaders: listOrNull(rule.AllowedHeaders),
+			ExposeHeaders:  listOrNull(rule.ExposeHeaders),
+			MaxAgeSeconds:  maxAge,
+		}
+	}
 	m.Status = types.StringValue(b.Status)
 	m.Endpoint = stringOrNull(b.Endpoint)
 	m.URL = stringOrNull(b.URL)

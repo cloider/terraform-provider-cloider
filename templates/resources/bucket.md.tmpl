@@ -38,6 +38,13 @@ and `bucket_id`.
 
 {{ tffile "examples/resources/cloider_bucket/website.tf" }}
 
+### CORS Rules
+
+The Cloider dashboard keeps working whatever the rules say, and the first rule whose origin matches
+answers a preflight.
+
+{{ tffile "examples/resources/cloider_bucket/cors.tf" }}
+
 ### Bucket with an Access Key
 
 {{ tffile "examples/resources/cloider_bucket/with-key.tf" }}

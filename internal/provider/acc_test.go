@@ -101,20 +101,35 @@ data "cloider_bucket_regions" "all" {}
 
 func TestAccBucketAndKey(t *testing.T) {
 	name := testAccName()
-	config := func(public, versioning bool) string {
+	config := func(public, versioning bool, extra string) string {
 		return fmt.Sprintf(`
 resource "cloider_bucket" "assets" {
   name       = %q
   public     = %t
   versioning = %t
+%s
 }
 
 resource "cloider_bucket_key" "deploy" {
   label   = "tfacc deploy"
   buckets = [cloider_bucket.assets.id]
 }
-`, name, public, versioning)
+`, name, public, versioning, extra)
 	}
+	cors := `
+  cors_rule {
+    id              = "app"
+    allowed_origins = ["https://app.example.com", "https://*.example.com"]
+    allowed_methods = ["GET", "PUT"]
+    allowed_headers = ["Content-Type"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 600
+  }
+
+  cors_rule {
+    allowed_origins = ["*"]
+    allowed_methods = ["HEAD"]
+  }`
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -122,7 +137,7 @@ resource "cloider_bucket_key" "deploy" {
 		CheckDestroy:             testAccCheckDestroyed(t),
 		Steps: []resource.TestStep{
 			{
-				Config: config(false, false),
+				Config: config(false, false, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloider_bucket.assets", "status", "Ready"),
 					resource.TestCheckResourceAttrSet("cloider_bucket.assets", "endpoint"),
@@ -131,7 +146,7 @@ resource "cloider_bucket_key" "deploy" {
 				),
 			},
 			{
-				Config: config(true, true),
+				Config: config(true, true, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloider_bucket.assets", "public", "true"),
 					resource.TestCheckResourceAttr("cloider_bucket.assets", "versioning", "true"),
@@ -139,8 +154,16 @@ resource "cloider_bucket_key" "deploy" {
 			},
 			{
 				// Versioning that was on can only be suspended, which reads back as off
-				Config: config(true, false),
+				Config: config(true, false, ""),
 				Check:  resource.TestCheckResourceAttr("cloider_bucket.assets", "versioning", "false"),
+			},
+			{
+				Config: config(true, false, cors),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("cloider_bucket.assets", "cors_rule.#", "2"),
+					resource.TestCheckResourceAttr("cloider_bucket.assets", "cors_rule.0.allowed_origins.1", "https://*.example.com"),
+					resource.TestCheckNoResourceAttr("cloider_bucket.assets", "cors_rule.1.id"),
+				),
 			},
 			{ResourceName: "cloider_bucket.assets", ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"timeouts"}},
 			{ResourceName: "cloider_bucket_key.deploy", ImportState: true, ImportStateVerify: true, ImportStateVerifyIgnore: []string{"secret_key"}},

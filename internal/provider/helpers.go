@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cloider/terraform-provider-cloider/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -108,6 +109,27 @@ func stringsOf(ctx context.Context, set types.Set) ([]string, diag.Diagnostics) 
 		return values, nil
 	}
 	diags := set.ElementsAs(ctx, &values, false)
+	return values, diags
+}
+
+// listOrNull is like setOrNull, for a list.
+func listOrNull(values []string) types.List {
+	if len(values) == 0 {
+		return types.ListNull(types.StringType)
+	}
+	elems := make([]attr.Value, len(values))
+	for i, v := range values {
+		elems[i] = types.StringValue(v)
+	}
+	return types.ListValueMust(types.StringType, elems)
+}
+
+func stringsOfList(ctx context.Context, list types.List) ([]string, diag.Diagnostics) {
+	values := []string{}
+	if list.IsNull() || list.IsUnknown() {
+		return values, nil
+	}
+	diags := list.ElementsAs(ctx, &values, false)
 	return values, diags
 }
 

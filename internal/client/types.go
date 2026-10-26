@@ -122,6 +122,22 @@ type BucketVersioning struct {
 	Status string `json:"status"`
 }
 
+// BucketCorsRule is one of a bucket's CORS rules. A max age of 0 leaves it out.
+type BucketCorsRule struct {
+	ID             string   `json:"id"`
+	AllowedOrigins []string `json:"allowed_origins"`
+	AllowedMethods []string `json:"allowed_methods"`
+	AllowedHeaders []string `json:"allowed_headers"`
+	ExposeHeaders  []string `json:"expose_headers"`
+	MaxAgeSeconds  int64    `json:"max_age_seconds"`
+}
+
+// BucketCors is GET /buckets/<id>/cors, and the body of its PUT. No rules means
+// any origin.
+type BucketCors struct {
+	Rules []BucketCorsRule `json:"rules"`
+}
+
 type BucketKeyForm struct {
 	Label      string   `json:"label"`
 	AllBuckets bool     `json:"all_buckets"`

@@ -76,6 +76,34 @@ output "site_url" {
 }
 ```
 
+### CORS Rules
+
+The Cloider dashboard keeps working whatever the rules say, and the first rule whose origin matches
+answers a preflight.
+
+```terraform
+# Only these websites can use the bucket from a browser: the app uploads with
+# presigned URLs and reads the ETag of each part, and the marketing site reads
+# files. Without cors_rule blocks any website can.
+resource "cloider_bucket" "uploads" {
+  name = "acme-uploads"
+
+  cors_rule {
+    id              = "web-app"
+    allowed_origins = ["https://app.acme.com"]
+    allowed_methods = ["GET", "PUT", "POST"]
+    allowed_headers = ["*"]
+    expose_headers  = ["ETag"]
+    max_age_seconds = 3000
+  }
+
+  cors_rule {
+    allowed_origins = ["https://*.acme.com"]
+    allowed_methods = ["GET", "HEAD"]
+  }
+}
+```
+
 ### Bucket with an Access Key
 
 ```terraform
@@ -136,6 +164,7 @@ resource "cloider_bucket" "uploads" {
 
 ### Optional
 
+- `cors_rule` (Block List) The websites that can use the bucket from a browser. Without `cors_rule` blocks any website can. With them only the origins they list can, and the Cloider dashboard always can. The first rule whose origin matches answers a preflight. (see [below for nested schema](#nestedblock--cors_rule))
 - `error_document` (String) The key the website serves, with a 404, for anything missing. Defaults to `""`, a built-in page.
 - `index_document` (String) The file the website serves for a path ending in a slash, a name without a slash. Defaults to `index.html`.
 - `public` (Boolean) Whether anyone may read the bucket's files without a key. Defaults to `false`.
@@ -152,6 +181,22 @@ resource "cloider_bucket" "uploads" {
 - `status` (String) `Ready`, `Failed` or `Terminating`.
 - `url` (String) The bucket's url, where a public bucket's files are read.
 - `website_url` (String) The website's own address, `https://<name>.s3-website.<region>.<domain>`, while `website` is on.
+
+<a id="nestedblock--cors_rule"></a>
+### Nested Schema for `cors_rule`
+
+Required:
+
+- `allowed_methods` (List of String) Any of `GET`, `HEAD`, `PUT`, `POST` and `DELETE`.
+- `allowed_origins` (List of String) Origins as browsers send them, in lower case and without a path, like `https://app.example.com`. `https://*.example.com` matches its subdomains, `*` any website.
+
+Optional:
+
+- `allowed_headers` (List of String) Request headers a page may send, like `Content-Type`. `*` for any, or a prefix like `x-amz-*`.
+- `expose_headers` (List of String) Response headers a page's script can read, like `ETag`.
+- `id` (String) A name for the rule.
+- `max_age_seconds` (Number) How long browsers may reuse a preflight answer, 1 to 86400. Leave it out for their default.
+
 
 <a id="nestedatt--timeouts"></a>
 ### Nested Schema for `timeouts`
