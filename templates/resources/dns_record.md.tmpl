@@ -33,7 +33,7 @@ Leave `name` out for a record at the domain itself, often called the apex or `@`
 
 ### ALIAS Record
 
-An `ALIAS` takes one host name and can't share its name with `A`, `AAAA` or `CNAME` records. Creating one at the domain itself replaces the `A` record the domain was created with while that record still points at Cloider. If it points elsewhere, the `ALIAS` is refused until that `A` record is deleted.
+An `ALIAS` takes one host name and can't share its name with `A`, `AAAA` or `CNAME` records. A custom domain is created with an `ALIAS` at the domain itself that points at `cloider.app`, and moved to the app's free subdomain when a `cloider_target` first routes the domain to an app that has one. While it still points at Cloider, an `A`, `AAAA` or `ALIAS` record without a `name` replaces it. If it points elsewhere, a new `ALIAS` is refused until that record is deleted.
 
 {{ tffile "examples/resources/cloider_dns_record/alias.tf" }}
 

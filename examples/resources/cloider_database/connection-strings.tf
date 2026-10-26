@@ -18,7 +18,7 @@ output "mysql_url" {
 }
 
 output "mongodb_url" {
-  value     = "mongodb://${local.mongo.user}:${urlencode(local.mongo.password)}@${local.mongo.host}:${local.mongo.port}/${local.mongo.name}?tls=true"
+  value     = "mongodb://${local.mongo.user}:${urlencode(local.mongo.password)}@${local.mongo.host}:${local.mongo.port}/${local.mongo.name}?directConnection=true&tls=true"
   sensitive = true
 }
 
