@@ -368,6 +368,47 @@ resource "cloider_target" "web" {
 				ExpectError: regexp.MustCompile(`root\s+of\s+its\s+domain`),
 			},
 			{
+				// A LoadBalancer takes the whole domain too, without a protocol of its own
+				Config: config(`
+  cluster_id   = cloider_cluster.web.id
+  loadbalancer = "games/server"
+`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("cloider_target.web", plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("loadbalancer"), knownvalue.StringExact("games/server")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("loadbalancer_ip"), knownvalue.StringExact("203.0.113.7")),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("bucket_id"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("namespace"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("protocol"), knownvalue.Null()),
+				},
+			},
+			{
+				// and switches back to a Service with its routing
+				Config: config(`
+  cluster_id = cloider_cluster.web.id
+  namespace  = "shop"
+  service    = "web"
+  port       = 80
+`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("cloider_target.web", plancheck.ResourceActionUpdate)},
+				},
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("loadbalancer"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_target.web", tfjsonpath.New("protocol"), knownvalue.StringExact("TCP")),
+				},
+			},
+			{
+				Config: config(`
+  cluster_id   = cloider_cluster.web.id
+  loadbalancer = "games/server"
+  port         = 25565
+`),
+				ExpectError: regexp.MustCompile(`Invalid Attribute Combination`),
+			},
+			{
 				Config: config(`
   app_id    = "a1b2c3"
   bucket_id = "b4c5d6"

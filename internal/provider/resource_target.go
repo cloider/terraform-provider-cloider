@@ -51,7 +51,10 @@ type targetModel struct {
 	Protocol   types.String `tfsdk:"protocol"`
 	AppID      types.String `tfsdk:"app_id"`
 	BucketID   types.String `tfsdk:"bucket_id"`
-	CreatedAt  types.String `tfsdk:"created_at"`
+	// <namespace>/<service> of a LoadBalancer target
+	Loadbalancer   types.String `tfsdk:"loadbalancer"`
+	LoadbalancerIP types.String `tfsdk:"loadbalancer_ip"`
+	CreatedAt      types.String `tfsdk:"created_at"`
 }
 
 func (r *targetResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -65,7 +68,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, to an app, or to a `cloider_bucket`'s static website, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served.",
+		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, to an app, or to a `cloider_bucket`'s static website, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served. A custom domain can instead point straight at a LoadBalancer Service in a cluster, with an A record to its IP, for any port and protocol.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The target's id.",
@@ -92,11 +95,8 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.String{targetPathDefault{}},
 			},
 			"cluster_id": schema.StringAttribute{
-				MarkdownDescription: "The id of the `cloider_cluster` whose Service to route to. Set this, with `namespace`, `service` and `port`, or `app_id`, or `bucket_id`.",
+				MarkdownDescription: "The id of the `cloider_cluster` whose Service to route to. Set this, with `namespace`, `service` and `port` or with `loadbalancer`, or `app_id`, or `bucket_id`.",
 				Optional:            true,
-				Validators: []validator.String{
-					stringvalidator.AlsoRequires(path.MatchRoot("namespace"), path.MatchRoot("service"), path.MatchRoot("port")),
-				},
 			},
 			"namespace": schema.StringAttribute{
 				MarkdownDescription: clusterOnly("The Service's namespace."),
@@ -122,9 +122,9 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed:            true,
 				Validators: []validator.String{
 					stringvalidator.OneOf("TCP", "UDP"),
-					stringvalidator.ConflictsWith(path.MatchRoot("app_id"), path.MatchRoot("bucket_id")),
+					stringvalidator.ConflictsWith(path.MatchRoot("app_id"), path.MatchRoot("bucket_id"), path.MatchRoot("loadbalancer")),
 				},
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{protocolPlan{}},
 			},
 			"app_id": schema.StringAttribute{
 				MarkdownDescription: "The id of the app to route to, see `cloider app list -o wide`. Set this, `bucket_id` or `cluster_id`. An app has to be deployed before it can be routed to.",
@@ -133,6 +133,19 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 			"bucket_id": schema.StringAttribute{
 				MarkdownDescription: "The id of the `cloider_bucket` whose static website to serve. Set this, `app_id` or `cluster_id`. A website takes the whole domain, so `path` and `target_path` stay `/`, and the bucket's `website` has to be on.",
 				Optional:            true,
+			},
+			"loadbalancer": schema.StringAttribute{
+				MarkdownDescription: "The LoadBalancer Service in `cluster_id` to point the domain at, as `<namespace>/<service>`. The domain gets an A record to its IP, which follows the IP when the Service is recreated, so it carries any port and protocol and Cloider adds no HTTPS. It takes the whole domain, so `path` and `target_path` stay `/` and the domain can have no other targets. Custom domains only, and the Service needs an IP before the target can be created.",
+				Optional:            true,
+				Validators: []validator.String{
+					stringvalidator.RegexMatches(regexp.MustCompile(`^[^/]+/[^/]+$`), "must be <namespace>/<service>"),
+					stringvalidator.AlsoRequires(path.MatchRoot("cluster_id")),
+					stringvalidator.ConflictsWith(path.MatchRoot("namespace"), path.MatchRoot("service"), path.MatchRoot("port")),
+				},
+			},
+			"loadbalancer_ip": schema.StringAttribute{
+				MarkdownDescription: "The IP the domain's A record points at, for a `loadbalancer` target. Empty while the LoadBalancer has none, when the domain has no A record either.",
+				Computed:            true,
 			},
 			"created_at": schema.StringAttribute{
 				MarkdownDescription: "When the target was created, RFC 3339.",
@@ -146,6 +159,66 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 func (r *targetResource) ConfigValidators(context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{
 		resourcevalidator.ExactlyOneOf(path.MatchRoot("cluster_id"), path.MatchRoot("app_id"), path.MatchRoot("bucket_id")),
+		clusterSource{},
+	}
+}
+
+// clusterSource checks a cluster_id comes with what to route to in the cluster: a
+// LoadBalancer, or a Service's namespace, service and port. Like the attribute
+// validators, it leaves an unknown cluster_id alone.
+type clusterSource struct{}
+
+func (clusterSource) Description(context.Context) string {
+	return "cluster_id needs loadbalancer, or namespace, service and port."
+}
+
+func (v clusterSource) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (clusterSource) ValidateResource(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var clusterID, loadbalancer, namespace, service types.String
+	var port types.Int64
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("cluster_id"), &clusterID)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("loadbalancer"), &loadbalancer)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("namespace"), &namespace)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("service"), &service)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("port"), &port)...)
+	if resp.Diagnostics.HasError() || clusterID.IsNull() || clusterID.IsUnknown() || !loadbalancer.IsNull() {
+		return
+	}
+	if namespace.IsNull() || service.IsNull() || port.IsNull() {
+		resp.Diagnostics.AddAttributeError(path.Root("cluster_id"), "Invalid Attribute Combination",
+			"With cluster_id, set loadbalancer, or namespace, service and port.")
+	}
+}
+
+// protocolPlan keeps protocol from state when it isn't set, like UseStateForUnknown,
+// except that a LoadBalancer target, which carries every protocol, has none, and a
+// target switched from one learns its port's protocol on apply. UseStateForUnknown
+// would copy the LoadBalancer target's null into the plan.
+type protocolPlan struct{}
+
+func (protocolPlan) Description(context.Context) string {
+	return "The value in state, null for a LoadBalancer target."
+}
+
+func (m protocolPlan) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (protocolPlan) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	if !req.PlanValue.IsUnknown() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	var loadbalancer types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("loadbalancer"), &loadbalancer)...)
+	if !loadbalancer.IsNull() {
+		resp.PlanValue = types.StringNull()
+		return
+	}
+	if !req.State.Raw.IsNull() && !req.StateValue.IsNull() {
+		resp.PlanValue = req.StateValue
 	}
 }
 
@@ -184,6 +257,14 @@ func (r *targetResource) form(ctx context.Context, m targetModel) (client.Target
 	if !m.BucketID.IsNull() {
 		form.TargetType = "Bucket"
 		form.BucketId = m.BucketID.ValueString()
+		return form, nil
+	}
+	if !m.Loadbalancer.IsNull() {
+		namespace, service, _ := strings.Cut(m.Loadbalancer.ValueString(), "/")
+		form.TargetType = "LoadBalancer"
+		form.ClusterId = m.ClusterID.ValueString()
+		form.Namespace = namespace
+		form.Service = service
 		return form, nil
 	}
 
@@ -336,15 +417,22 @@ func fillTarget(m *targetModel, t client.Target) {
 	// service, so only a cluster target has it
 	switch t.TargetType {
 	case "App":
-		m.AppID, m.BucketID = types.StringValue(t.AppId), types.StringNull()
+		m.AppID, m.BucketID, m.Loadbalancer, m.LoadbalancerIP = types.StringValue(t.AppId), types.StringNull(), types.StringNull(), types.StringNull()
 		m.ClusterID, m.Namespace, m.Service, m.Port = types.StringNull(), types.StringNull(), types.StringNull(), types.Int64Null()
 		return
 	case "Bucket":
-		m.AppID, m.BucketID = types.StringNull(), types.StringValue(t.BucketId)
+		m.AppID, m.BucketID, m.Loadbalancer, m.LoadbalancerIP = types.StringNull(), types.StringValue(t.BucketId), types.StringNull(), types.StringNull()
 		m.ClusterID, m.Namespace, m.Service, m.Port = types.StringNull(), types.StringNull(), types.StringNull(), types.Int64Null()
 		return
+	case "LoadBalancer":
+		m.AppID, m.BucketID = types.StringNull(), types.StringNull()
+		m.ClusterID = types.StringValue(t.ClusterId)
+		m.Loadbalancer = types.StringValue(t.Namespace + "/" + t.Service)
+		m.LoadbalancerIP = types.StringValue(t.LoadbalancerIp)
+		m.Namespace, m.Service, m.Port = types.StringNull(), types.StringNull(), types.Int64Null()
+		return
 	}
-	m.AppID, m.BucketID = types.StringNull(), types.StringNull()
+	m.AppID, m.BucketID, m.Loadbalancer, m.LoadbalancerIP = types.StringNull(), types.StringNull(), types.StringNull(), types.StringNull()
 	m.ClusterID = types.StringValue(t.ClusterId)
 	m.Namespace = types.StringValue(t.Namespace)
 	m.Service = types.StringValue(t.Service)

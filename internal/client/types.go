@@ -236,23 +236,26 @@ type DnsRecordForm struct {
 }
 
 // Targets route a path of a domain to a cluster service, an app or a bucket's
-// website. Cluster targets carry the cluster's id and routing fields, app and
-// bucket targets only app_id or bucket_id: the api fills in the rest.
+// website, or a whole domain to a cluster's LoadBalancer with an A record.
+// Cluster targets carry the cluster's id and routing fields, LoadBalancer targets
+// the cluster's id and the LoadBalancer's namespace and service, app and bucket
+// targets only app_id or bucket_id: the api fills in the rest.
 type Target struct {
-	HashedId    string    `json:"hashed_id"`
-	DomainName  string    `json:"domain_name"`
-	TargetType  string    `json:"target_type"`
-	ClusterId   string    `json:"cluster_id"`
-	ClusterName string    `json:"cluster_name"`
-	AppId       string    `json:"app_id"`
-	BucketId    string    `json:"bucket_id"`
-	Namespace   string    `json:"namespace"`
-	Service     string    `json:"service"`
-	Port        int       `json:"port"`
-	Protocol    string    `json:"protocol"`
-	Path        string    `json:"path"`
-	TargetPath  string    `json:"target_path"`
-	CreatedAt   time.Time `json:"created_at"`
+	HashedId       string    `json:"hashed_id"`
+	DomainName     string    `json:"domain_name"`
+	TargetType     string    `json:"target_type"`
+	ClusterId      string    `json:"cluster_id"`
+	ClusterName    string    `json:"cluster_name"`
+	AppId          string    `json:"app_id"`
+	BucketId       string    `json:"bucket_id"`
+	LoadbalancerIp string    `json:"loadbalancer_ip"`
+	Namespace      string    `json:"namespace"`
+	Service        string    `json:"service"`
+	Port           int       `json:"port"`
+	Protocol       string    `json:"protocol"`
+	Path           string    `json:"path"`
+	TargetPath     string    `json:"target_path"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type TargetForm struct {

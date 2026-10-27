@@ -292,6 +292,11 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]any{"errors": map[string][]string{"path": {"A bucket website is served at the root of its domain, the path must be /"}}})
 			return
 		}
+		if form.TargetType == "LoadBalancer" && (form.Path != "/" || form.TargetPath != "/") {
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]any{"errors": map[string][]string{"path": {"A LoadBalancer takes the whole domain, the path must be /"}}})
+			return
+		}
 		t.DomainName, t.TargetType, t.Path, t.TargetPath = form.DomainName, form.TargetType, form.Path, form.TargetPath
 		switch form.TargetType {
 		case "App":
@@ -302,9 +307,16 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// and a bucket target to the website service, which serves the bucket
 			t.AppId, t.BucketId, t.ClusterId, t.ClusterName = "", form.BucketId, "", ""
 			t.Namespace, t.Service, t.Port, t.Protocol = "", "", 8006, "TCP"
+			t.LoadbalancerIp = ""
+		case "LoadBalancer":
+			// a LoadBalancer target has no port or protocol, its A record carries them all
+			t.AppId, t.BucketId, t.ClusterId = "", "", form.ClusterId
+			t.Namespace, t.Service, t.Port, t.Protocol = form.Namespace, form.Service, 0, ""
+			t.LoadbalancerIp = "203.0.113.7"
 		default:
 			t.AppId, t.BucketId, t.ClusterId, t.ClusterName = "", "", form.ClusterId, form.ClusterName
 			t.Namespace, t.Service, t.Port, t.Protocol = form.Namespace, form.Service, form.Port, form.Protocol
+			t.LoadbalancerIp = ""
 		}
 		f.targets[t.HashedId] = t
 		writeJSON(w, client.Created{HashedId: t.HashedId})

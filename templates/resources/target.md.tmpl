@@ -2,7 +2,7 @@
 page_title: "cloider_target Resource - cloider"
 subcategory: "Domains and Routing"
 description: |-
-  Routes a path of a domain to a Service in a Cloider cluster, to an app, or to a bucket's static website.
+  Routes a path of a domain to a Service in a Cloider cluster, to an app, or to a bucket's static website, or a domain to a LoadBalancer.
 ---
 
 # Resource: cloider_target
@@ -46,6 +46,23 @@ so `/` catches whatever no longer path does.
 The bucket's `website` has to be on. A website takes the whole domain, so `path` stays `/`.
 
 {{ tffile "examples/resources/cloider_target/bucket.tf" }}
+
+### Pointing a Domain at a LoadBalancer
+
+A LoadBalancer target gives the domain an A record to the IP of the LoadBalancer Service. If the
+Service is recreated and gets a new IP, the record follows it.
+
+You manage everything behind the LoadBalancer: the ingress controller or Gateway API implementation,
+its routing rules, and the TLS certificates and their renewal. Cloider sets up no HTTPS and issues
+no certificate for this target.
+
+The target takes the whole domain and passes on every port and protocol the Service exposes. `path`
+and `target_path` therefore stay `/`, and the domain can have no other `cloider_target`.
+
+The Service needs an IP before you create the target. For a complete setup, see [Point a domain at a
+LoadBalancer](https://docs.cloider.com/domains/targets#point-a-domain-at-a-loadbalancer).
+
+{{ tffile "examples/resources/cloider_target/loadbalancer.tf" }}
 
 {{ .SchemaMarkdown | trimspace }}
 
