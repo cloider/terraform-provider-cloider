@@ -6,7 +6,7 @@ Complete configurations to start from. Each folder is its own root module: `cd` 
 
 | Example                                            | What it creates                                                                                       |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| [getting-started](getting-started)                 | A cluster, a PostgreSQL database only it can reach, and a bucket with a key. Fits a free account.     |
+| [getting-started](getting-started)                 | A cluster, a PostgreSQL database only it can reach, and a bucket with a key.                          |
 | [kubernetes-app](kubernetes-app)                   | An app on its own cluster: registry project and tokens, database, the Kubernetes objects to run it, and a domain serving it. |
 | [custom-domain](custom-domain)                     | DNS for a domain you own: web, mail (MX, SPF, DMARC) and any other records.                           |
 | [multiple-environments](multiple-environments)     | Staging and production from one module, each with a cluster, a database and a bucket.                 |

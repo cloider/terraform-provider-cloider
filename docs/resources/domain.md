@@ -12,9 +12,20 @@ or a domain you own. A name under one of the roots in
 [`cloider_options`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/options)'
 `subdomain_roots` is claimed as a free subdomain, any other name is added as a custom domain.
 
-A custom domain is served by Cloider's DNS once its registrar points it at the `nameservers` in
-`cloider_options`. Add its records with
+A custom domain starts out unverified. Until you prove you own it, Cloider's DNS doesn't serve its
+records, it takes no [`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target),
+and it is deleted 7 days after it was added. To verify it, add the TXT record in its
+`verification_record_name` and `verification_record_value` at the DNS provider that hosts the domain
+now, and create a [`cloider_domain_verification`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain_verification).
+A domain under one you verified, or whose record is already in place, is verified as soon as it's
+added.
+
+Once it's verified, its registrar can point it at the `nameservers` in `cloider_options`, and Cloider's
+DNS serves the records you add with
 [`cloider_dns_record`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/dns_record).
+
+~> **Note:** Verify a domain before you point it at Cloider's nameservers. They don't answer for an
+unverified domain, so its TXT record can't be found there.
 
 !> **Warning:** Deleting a domain also deletes its DNS records and the routes to it.
 
@@ -43,12 +54,22 @@ resource "cloider_domain" "preview" {
 ### Custom Domain
 
 ```terraform
-# A domain you own. Point it at these nameservers at its registrar.
+# A domain you own. Add this TXT record where its DNS is hosted now and verify
+# it with cloider_domain_verification, then point it at these nameservers at its
+# registrar.
 resource "cloider_domain" "example" {
   name = "example.com"
 }
 
 data "cloider_options" "current" {}
+
+output "verification_record" {
+  value = {
+    type  = "TXT"
+    name  = cloider_domain.example.verification_record_name
+    value = cloider_domain.example.verification_record_value
+  }
+}
 
 output "nameservers" {
   value = data.cloider_options.current.nameservers
@@ -84,6 +105,9 @@ resource "cloider_dns_record" "www" {
 - `id` (String) The domain name.
 - `status` (String) `Pending` until something routes to it, `Active` while something does, `Suspended` once nothing does any more.
 - `type` (String) `Subdomain` or `CustomDomain`.
+- `verification_record_name` (String) The name of the TXT record that verifies a custom domain, `_cloider-verify.<name>`. Add it where the domain's DNS is hosted now, with `verification_record_value`. It stays set once the domain is verified. Null when the domain never needed one here: a free subdomain, a custom domain verified as soon as it was added (one under a domain you verified, or whose record was already in place), or one imported once verified.
+- `verification_record_value` (String) The TXT record's value, `cloider-verify=` and 32 hex digits. It is the same every time for this domain in your account, so a record left in place verifies the domain again if it is deleted and added back. Null when `verification_record_name` is.
+- `verified` (Boolean) Whether the domain is verified. A free subdomain is verified from the start, a custom domain once `cloider_domain_verification` finds its TXT record. Until then Cloider's DNS doesn't serve its records, it takes no `cloider_target`, and it is deleted 7 days after it was added. It is read on refresh, so it turns `true` on the plan after the apply that verified it.
 
 ## Import
 

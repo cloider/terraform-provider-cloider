@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -16,7 +17,7 @@ import (
 
 // Acceptance tests create real resources in the account of CLOIDER_TOKEN (or the
 // CLI's login) and only run with TF_ACC=1. They run one after another and each
-// makes at most one of a kind, which a free account has room for:
+// makes at most one of a kind, so an account with a little credit is enough:
 //
 //	TF_ACC=1 go test ./internal/provider -run TestAcc -timeout 60m
 
@@ -251,6 +252,9 @@ resource "cloider_dns_record" "spf" {
 				Config: config(3600),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloider_domain.example", "type", "CustomDomain"),
+					resource.TestCheckResourceAttr("cloider_domain.example", "verified", "false"),
+					resource.TestCheckResourceAttr("cloider_domain.example", "verification_record_name", "_cloider-verify."+domain),
+					resource.TestMatchResourceAttr("cloider_domain.example", "verification_record_value", regexp.MustCompile(`^cloider-verify=[0-9a-f]{32}$`)),
 					resource.TestCheckResourceAttr("cloider_dns_record.spf", "name", ""),
 				),
 			},
@@ -260,6 +264,19 @@ resource "cloider_dns_record" "spf" {
 			},
 			{ResourceName: "cloider_domain.example", ImportState: true, ImportStateVerify: true},
 			{ResourceName: "cloider_dns_record.www", ImportState: true, ImportStateVerify: true},
+			{
+				// Nobody can add the record under example.com, so this shows the api's answer
+				Config: config(300) + `
+resource "cloider_domain_verification" "example" {
+  domain = cloider_domain.example.name
+
+  timeouts = {
+    create = "20s"
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`No\s+TXT\s+record\s+named\s+_cloider-verify\.`),
+			},
 		},
 	})
 }

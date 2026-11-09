@@ -38,7 +38,7 @@ func TestProviderSchemas(t *testing.T) {
 		t.Errorf("%s: %s", d.Summary, d.Detail)
 	}
 
-	want := []string{"cloider_cluster", "cloider_database", "cloider_bucket", "cloider_bucket_key", "cloider_registry", "cloider_registry_token", "cloider_domain", "cloider_dns_record"}
+	want := []string{"cloider_cluster", "cloider_database", "cloider_bucket", "cloider_bucket_key", "cloider_registry", "cloider_registry_token", "cloider_domain", "cloider_domain_verification", "cloider_dns_record"}
 	for _, name := range want {
 		if _, ok := resp.ResourceSchemas[name]; !ok {
 			t.Errorf("no %s resource", name)

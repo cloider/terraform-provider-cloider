@@ -122,6 +122,7 @@ func (p *cloiderProvider) Resources(_ context.Context) []func() resource.Resourc
 		NewRegistryResource,
 		NewRegistryTokenResource,
 		NewDomainResource,
+		NewDomainVerificationResource,
 		NewDnsRecordResource,
 		NewTargetResource,
 	}

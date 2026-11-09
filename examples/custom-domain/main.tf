@@ -6,6 +6,13 @@ resource "cloider_domain" "this" {
   name = var.domain
 }
 
+# Waits until Cloider finds the TXT record from the verification_record output
+resource "cloider_domain_verification" "this" {
+  count = var.verify ? 1 : 0
+
+  domain = cloider_domain.this.name
+}
+
 resource "cloider_dns_record" "apex" {
   domain = cloider_domain.this.name
   type   = "A"

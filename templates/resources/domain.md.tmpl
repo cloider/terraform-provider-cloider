@@ -12,9 +12,20 @@ or a domain you own. A name under one of the roots in
 [`cloider_options`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/data-sources/options)'
 `subdomain_roots` is claimed as a free subdomain, any other name is added as a custom domain.
 
-A custom domain is served by Cloider's DNS once its registrar points it at the `nameservers` in
-`cloider_options`. Add its records with
+A custom domain starts out unverified. Until you prove you own it, Cloider's DNS doesn't serve its
+records, it takes no [`cloider_target`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/target),
+and it is deleted 7 days after it was added. To verify it, add the TXT record in its
+`verification_record_name` and `verification_record_value` at the DNS provider that hosts the domain
+now, and create a [`cloider_domain_verification`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain_verification).
+A domain under one you verified, or whose record is already in place, is verified as soon as it's
+added.
+
+Once it's verified, its registrar can point it at the `nameservers` in `cloider_options`, and Cloider's
+DNS serves the records you add with
 [`cloider_dns_record`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/dns_record).
+
+~> **Note:** Verify a domain before you point it at Cloider's nameservers. They don't answer for an
+unverified domain, so its TXT record can't be found there.
 
 !> **Warning:** Deleting a domain also deletes its DNS records and the routes to it.
 

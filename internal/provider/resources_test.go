@@ -214,6 +214,155 @@ resource "cloider_domain" "again" {
 	})
 }
 
+func TestDomainVerification(t *testing.T) {
+	server, fake := startFakeAPI(t)
+	// The record shows up on the third check, which the verification waits for
+	fake.txtFoundAfter("example.com", 2)
+
+	domain := fakeProviderConfig(server) + `
+resource "cloider_domain" "example" {
+  name = "example.com"
+}
+`
+	target := func(from string) string {
+		return `
+resource "cloider_target" "app" {
+  domain = ` + from + `
+  app_id = "a1b2c3"
+}
+`
+	}
+	verified := domain + `
+resource "cloider_domain_verification" "example" {
+  domain = cloider_domain.example.name
+}
+` + target("cloider_domain_verification.example.domain")
+	record := []statecheck.StateCheck{
+		statecheck.ExpectKnownValue("cloider_domain.example", tfjsonpath.New("verification_record_name"), knownvalue.StringExact("_cloider-verify.example.com")),
+		statecheck.ExpectKnownValue("cloider_domain.example", tfjsonpath.New("verification_record_value"), knownvalue.StringExact(fakeVerificationValue("example.com"))),
+	}
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: domain,
+				ConfigStateChecks: append([]statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_domain.example", tfjsonpath.New("verified"), knownvalue.Bool(false)),
+				}, record...),
+			},
+			{
+				Config:      domain + target("cloider_domain.example.name"),
+				ExpectError: regexp.MustCompile(`Verify\s+example\.com\s+first`),
+			},
+			{
+				Config: verified,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_domain_verification.example", tfjsonpath.New("id"), knownvalue.StringExact("example.com")),
+					statecheck.ExpectKnownValue("cloider_target.app", tfjsonpath.New("app_id"), knownvalue.StringExact("a1b2c3")),
+				},
+			},
+			{
+				// Refreshed as verified, the domain keeps its record without a diff
+				Config: verified,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+				ConfigStateChecks: append([]statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_domain.example", tfjsonpath.New("verified"), knownvalue.Bool(true)),
+				}, record...),
+			},
+			{
+				ResourceName:            "cloider_domain_verification.example",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"},
+			},
+			{
+				// The api no longer shows a verified domain's record, so an import has none
+				ResourceName:            "cloider_domain.example",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"verification_record_name", "verification_record_value"},
+			},
+		},
+	})
+}
+
+func TestDomainVerifiedWhenAdded(t *testing.T) {
+	server, fake := startFakeAPI(t)
+	fake.txtFoundAfter("example.net", 0)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fakeProviderConfig(server) + `
+resource "cloider_domain" "net" {
+  name = "example.net"
+}
+
+resource "cloider_domain" "free" {
+  name = "my-app.cloider.app"
+}
+
+resource "cloider_target" "net" {
+  domain = cloider_domain.net.name
+  app_id = "a1b2c3"
+}
+
+resource "cloider_domain_verification" "free" {
+  domain = cloider_domain.free.name
+}
+`,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("cloider_domain.net", tfjsonpath.New("verified"), knownvalue.Bool(true)),
+					statecheck.ExpectKnownValue("cloider_domain.net", tfjsonpath.New("verification_record_name"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_domain.net", tfjsonpath.New("verification_record_value"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_domain.free", tfjsonpath.New("verified"), knownvalue.Bool(true)),
+					statecheck.ExpectKnownValue("cloider_domain.free", tfjsonpath.New("verification_record_name"), knownvalue.Null()),
+					statecheck.ExpectKnownValue("cloider_domain_verification.free", tfjsonpath.New("id"), knownvalue.StringExact("my-app.cloider.app")),
+				},
+			},
+		},
+	})
+}
+
+func TestDomainVerificationFails(t *testing.T) {
+	server := newFakeAPI(t)
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: fakeProviderConfig(server) + `
+resource "cloider_domain_verification" "missing" {
+  domain = "example.org"
+}
+`,
+				ExpectError: regexp.MustCompile(`example\.org\s+isn't\s+one\s+of\s+your\s+domains`),
+			},
+			{
+				// The record never shows up, so it gives up with the api's last answer
+				Config: fakeProviderConfig(server) + `
+resource "cloider_domain" "example" {
+  name = "example.com"
+}
+
+resource "cloider_domain_verification" "example" {
+  domain = cloider_domain.example.name
+
+  timeouts = {
+    create = "1s"
+  }
+}
+`,
+				ExpectError: regexp.MustCompile(`No\s+TXT\s+record\s+named\s+_cloider-verify\.example\.com`),
+			},
+		},
+	})
+}
+
 func TestClusterDataSource(t *testing.T) {
 	server := newFakeAPI(t)
 	clusters := fakeProviderConfig(server) + `

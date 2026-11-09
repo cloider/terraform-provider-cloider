@@ -68,7 +68,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, to an app, or to a `cloider_bucket`'s static website, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served. A custom domain can instead point straight at a LoadBalancer Service in a cluster, with an A record to its IP, for any port and protocol.",
+		MarkdownDescription: "Routes a path of a `cloider_domain` to a Service in a `cloider_cluster`, to an app, or to a `cloider_bucket`'s static website, over HTTPS. This is how a cluster's Services are reached from the internet: Ingress objects in a cluster aren't served. A custom domain can instead point straight at a LoadBalancer Service in a cluster, with an A record to its IP, for any port and protocol. A custom domain has to be verified first, see `cloider_domain_verification`.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "The target's id.",
@@ -76,7 +76,7 @@ func (r *targetResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"domain": schema.StringAttribute{
-				MarkdownDescription: "The domain to route, a free subdomain or a custom domain. Changing it replaces the target.",
+				MarkdownDescription: "The domain to route, a free subdomain or a verified custom domain. Set it from the domain's `cloider_domain_verification`, as `cloider_domain_verification.<name>.domain`, so the target is created once the domain is verified. Changing it replaces the target.",
 				Required:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},

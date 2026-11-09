@@ -148,7 +148,9 @@ resource "cloider_bucket" "client_assets" {
 
 * **Rate limit.** The api allows 100 requests a minute per client. The provider paces itself to stay
   under that, so a large refresh is slower rather than failing.
-* **Free accounts** have room for one cluster, one database, one bucket and one registry project.
+* **Funds.** Creating a cluster, database, bucket or registry project needs credit or balance left in
+  the account, and a suspended account can't create any. The api's refusal, such as `Your account has
+  no credit left. Top up to continue.`, is the error Terraform shows.
 * **Timeouts.** Creating a cluster or database waits until it is ready, 20 minutes by default. Set a
   resource's `timeouts`, such as `timeouts = { create = "40m" }`, to wait longer or shorter.
 

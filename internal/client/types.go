@@ -213,10 +213,19 @@ type CreatedRegistryToken struct {
 // Domains and DNS
 
 type Domain struct {
-	DomainName string    `json:"domain_name"`
-	DomainType string    `json:"domain_type"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
+	DomainName string `json:"domain_name"`
+	DomainType string `json:"domain_type"`
+	Status     string `json:"status"`
+	Verified   bool   `json:"verified"`
+	// The TXT record that verifies the domain, nil once it is verified and in lists
+	Verification *DomainVerification `json:"verification"`
+	CreatedAt    time.Time           `json:"created_at"`
+}
+
+type DomainVerification struct {
+	RecordType  string `json:"record_type"`
+	RecordName  string `json:"record_name"`
+	RecordValue string `json:"record_value"`
 }
 
 type DnsRecord struct {

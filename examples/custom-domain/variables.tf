@@ -3,6 +3,12 @@ variable "domain" {
   type        = string
 }
 
+variable "verify" {
+  description = "Whether to verify the domain. Set it once the TXT record from the verification_record output is in place."
+  type        = bool
+  default     = false
+}
+
 variable "web_ipv4" {
   description = "The addresses the domain and www point at."
   type        = list(string)

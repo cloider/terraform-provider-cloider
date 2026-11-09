@@ -31,11 +31,14 @@ func NewDomainResource() resource.Resource {
 }
 
 type domainModel struct {
-	ID        types.String `tfsdk:"id"`
-	Name      types.String `tfsdk:"name"`
-	Type      types.String `tfsdk:"type"`
-	Status    types.String `tfsdk:"status"`
-	CreatedAt types.String `tfsdk:"created_at"`
+	ID                      types.String `tfsdk:"id"`
+	Name                    types.String `tfsdk:"name"`
+	Type                    types.String `tfsdk:"type"`
+	Status                  types.String `tfsdk:"status"`
+	Verified                types.Bool   `tfsdk:"verified"`
+	VerificationRecordName  types.String `tfsdk:"verification_record_name"`
+	VerificationRecordValue types.String `tfsdk:"verification_record_value"`
+	CreatedAt               types.String `tfsdk:"created_at"`
 }
 
 // The api keeps names lower case without the trailing dot, so a name written
@@ -52,7 +55,7 @@ func (r *domainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A free subdomain under one of Cloider's roots, such as `my-app.cloider.app`, or a domain you own. Point a domain you own at the nameservers in `cloider_options`, then add its records with `cloider_dns_record`. Deleting a domain also deletes its DNS records and the routes to it.",
+		MarkdownDescription: "A free subdomain under one of Cloider's roots, such as `my-app.cloider.app`, or a domain you own. A domain you own starts out unverified: add the TXT record in `verification_record_name` and `verification_record_value` where its DNS is hosted now and verify it with `cloider_domain_verification`. Then point it at the nameservers in `cloider_options` and add its records with `cloider_dns_record`. Deleting a domain also deletes its DNS records and the routes to it.",
 		Attributes: map[string]schema.Attribute{
 			"id": computedString("The domain name."),
 			"name": schema.StringAttribute{
@@ -68,6 +71,12 @@ func (r *domainResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				MarkdownDescription: "`Pending` until something routes to it, `Active` while something does, `Suspended` once nothing does any more.",
 				Computed:            true,
 			},
+			"verified": schema.BoolAttribute{
+				MarkdownDescription: "Whether the domain is verified. A free subdomain is verified from the start, a custom domain once `cloider_domain_verification` finds its TXT record. Until then Cloider's DNS doesn't serve its records, it takes no `cloider_target`, and it is deleted 7 days after it was added. It is read on refresh, so it turns `true` on the plan after the apply that verified it.",
+				Computed:            true,
+			},
+			"verification_record_name": computedString("The name of the TXT record that verifies a custom domain, `_cloider-verify.<name>`. Add it where the domain's DNS is hosted now, with `verification_record_value`. It stays set once the domain is verified. Null when the domain never needed one here: a free subdomain, a custom domain verified as soon as it was added (one under a domain you verified, or whose record was already in place), or one imported once verified."),
+			"verification_record_value": computedString("The TXT record's value, `cloider-verify=` and 32 hex digits. It is the same every time for this domain in your account, so a record left in place verifies the domain again if it is deleted and added back. Null when `verification_record_name` is."),
 			"created_at": computedString("When the domain was added, RFC 3339."),
 		},
 	}
@@ -166,5 +175,17 @@ func fillDomain(m *domainModel, d client.Domain) {
 	m.Name = types.StringValue(d.DomainName)
 	m.Type = types.StringValue(d.DomainType)
 	m.Status = types.StringValue(d.Status)
+	m.Verified = types.BoolValue(d.Verified)
 	m.CreatedAt = timeString(d.CreatedAt)
+
+	// The api stops showing the record once the domain is verified. It stays in
+	// state, or a TXT record made from it would then plan a change
+	switch {
+	case d.Verification != nil:
+		m.VerificationRecordName = types.StringValue(d.Verification.RecordName)
+		m.VerificationRecordValue = types.StringValue(d.Verification.RecordValue)
+	case m.VerificationRecordName.IsUnknown():
+		m.VerificationRecordName = types.StringNull()
+		m.VerificationRecordValue = types.StringNull()
+	}
 }

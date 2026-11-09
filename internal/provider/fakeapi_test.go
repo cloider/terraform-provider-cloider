@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,10 +16,10 @@ import (
 	"github.com/cloider/terraform-provider-cloider/internal/client"
 )
 
-// fakeAPI answers the routes the cluster, database, domain, DNS record and
-// target resources use (bucket targets without the buckets themselves), the way the api does, quirks included: lists that hide
-// Terminated rows, GET by id that still shows them, plain text 404s. Everything
-// settles at once, so waits return on their first poll.
+// fakeAPI answers the routes the cluster, database, domain, domain verification,
+// DNS record and target resources use (bucket targets without the buckets themselves), the way the api does, quirks included: lists that hide
+// Terminated rows, GET by id that still shows them, plain text 404s, custom domains
+// that start unverified. Everything settles at once, so waits return on their first poll.
 type fakeAPI struct {
 	mu        sync.Mutex
 	nextID    int
@@ -26,9 +28,18 @@ type fakeAPI struct {
 	domains   map[string]*client.Domain
 	records   map[int64]*client.DnsRecord
 	targets   map[string]*client.Target
+	// Verify checks that miss each custom domain's TXT record before it is found,
+	// see txtFoundAfter. A domain without an entry never has one.
+	txt map[string]int
 }
 
 func newFakeAPI(t *testing.T) *httptest.Server {
+	server, _ := startFakeAPI(t)
+	return server
+}
+
+// startFakeAPI is newFakeAPI for a test that sets the api's data up first.
+func startFakeAPI(t *testing.T) (*httptest.Server, *fakeAPI) {
 	t.Helper()
 	f := &fakeAPI{
 		clusters:  map[string]*client.Cluster{},
@@ -36,6 +47,7 @@ func newFakeAPI(t *testing.T) *httptest.Server {
 		domains:   map[string]*client.Domain{},
 		records:   map[int64]*client.DnsRecord{},
 		targets:   map[string]*client.Target{},
+		txt:       map[string]int{},
 	}
 	server := httptest.NewServer(f)
 	t.Cleanup(server.Close)
@@ -43,7 +55,23 @@ func newFakeAPI(t *testing.T) *httptest.Server {
 	// The provider block below has its own token, the developer's login stays out of it
 	t.Setenv("CLOIDER_CONFIG_DIR", t.TempDir())
 	client.PollInterval = 10 * time.Millisecond
-	return server
+	verifyInterval = 10 * time.Millisecond
+	return server, f
+}
+
+// txtFoundAfter has the domain's TXT record missed by that many verify checks
+// before it is found. With 0 it is in place, so adding the domain verifies it.
+func (f *fakeAPI) txtFoundAfter(domain string, misses int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.txt[domain] = misses
+}
+
+// fakeVerificationValue stands in for the api's value, which is also the same
+// for a domain every time.
+func fakeVerificationValue(domain string) string {
+	sum := sha256.Sum256([]byte(domain))
+	return "cloider-verify=" + hex.EncodeToString(sum[:])[:32]
 }
 
 func fakeProviderConfig(server *httptest.Server) string {
@@ -215,8 +243,32 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Type string `json:"domain_type"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
-		d := &client.Domain{DomainName: body.Name, DomainType: body.Type, Status: "Pending", CreatedAt: time.Now()}
+		d := &client.Domain{DomainName: body.Name, DomainType: body.Type, Status: "Pending", Verified: true, CreatedAt: time.Now()}
+		if misses, ok := f.txt[body.Name]; body.Type == "CustomDomain" && (!ok || misses > 0) {
+			d.Verified = false
+			d.Verification = &client.DomainVerification{RecordType: "TXT", RecordName: "_cloider-verify." + body.Name, RecordValue: fakeVerificationValue(body.Name)}
+		}
 		f.domains[body.Name] = d
+		writeJSON(w, d)
+	case "POST domains/:id/verify":
+		d, ok := f.domains[parts[1]]
+		if !ok {
+			notFound(w)
+			return
+		}
+		if !d.Verified {
+			misses, ok := f.txt[d.DomainName]
+			if !ok || misses > 0 {
+				if ok {
+					f.txt[d.DomainName] = misses - 1
+				}
+				w.WriteHeader(http.StatusBadRequest)
+				writeJSON(w, map[string]any{"errors": map[string][]string{"_": {"No TXT record named " + d.Verification.RecordName + " with the value " +
+					d.Verification.RecordValue + " was found yet. A record added a moment ago can take a few minutes to appear."}}})
+				return
+			}
+			d.Verified, d.Verification = true, nil
+		}
 		writeJSON(w, d)
 	case "POST domains/:id/dns-records":
 		if _, ok := f.domains[parts[1]]; !ok {
@@ -277,8 +329,14 @@ func (f *fakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		var form client.TargetForm
 		json.NewDecoder(r.Body).Decode(&form)
-		if _, ok := f.domains[form.DomainName]; !ok {
+		d, ok := f.domains[form.DomainName]
+		if !ok {
 			notFound(w)
+			return
+		}
+		if !d.Verified {
+			w.WriteHeader(http.StatusBadRequest)
+			writeJSON(w, map[string]any{"errors": map[string][]string{"_": {"Verify " + d.DomainName + " first: add the TXT record shown on its domain page, then verify it."}}})
 			return
 		}
 		if form.Path == "" {

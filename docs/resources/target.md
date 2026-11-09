@@ -16,6 +16,11 @@ to the Service's port as plain HTTP.
 This is how a cluster's Services are reached from the internet: Ingress objects inside a cluster
 aren't served.
 
+~> **Note:** A custom domain takes targets once it's verified. Take the target's `domain` from the
+domain's [`cloider_domain_verification`](https://registry.terraform.io/providers/cloider/cloider/latest/docs/resources/domain_verification),
+as the LoadBalancer example below does, so the target is created after it. Free subdomains are
+verified from the start.
+
 -> **Note:** A domain routes each path to one target. A target's `path` covers everything under it,
 so `/` catches whatever no longer path does.
 
@@ -149,10 +154,15 @@ resource "cloider_domain" "games" {
   name = "play.example.com"
 }
 
+# Waits for the domain's TXT record, see cloider_domain_verification
+resource "cloider_domain_verification" "games" {
+  domain = cloider_domain.games.name
+}
+
 # play.example.com resolves to the IP of the server LoadBalancer in the games
 # namespace, on whatever ports it listens on
 resource "cloider_target" "games" {
-  domain       = cloider_domain.games.name
+  domain       = cloider_domain_verification.games.domain
   cluster_id   = cloider_cluster.web.id
   loadbalancer = "games/server"
 }
@@ -163,7 +173,7 @@ resource "cloider_target" "games" {
 
 ### Required
 
-- `domain` (String) The domain to route, a free subdomain or a custom domain. Changing it replaces the target.
+- `domain` (String) The domain to route, a free subdomain or a verified custom domain. Set it from the domain's `cloider_domain_verification`, as `cloider_domain_verification.<name>.domain`, so the target is created once the domain is verified. Changing it replaces the target.
 
 ### Optional
 

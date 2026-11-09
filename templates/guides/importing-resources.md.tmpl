@@ -14,17 +14,18 @@ recreating them. Every Cloider resource can be imported.
 
 Most resources are imported by their id. The CLI's `-o wide` output adds an id column:
 
-| Resource                 | Import ID                | Where to find it                         |
-|--------------------------|--------------------------|------------------------------------------|
-| `cloider_cluster`        | The cluster's id         | `cloider cluster list -o wide`           |
-| `cloider_database`       | The database's id        | `cloider db list -o wide`                |
-| `cloider_bucket`         | The bucket's id          | `cloider bucket list -o wide`            |
-| `cloider_bucket_key`     | The key's id             | `cloider bucket key list -o wide`        |
-| `cloider_registry`       | The project's id         | `cloider registry list -o wide`          |
-| `cloider_registry_token` | The token's id           | `cloider registry token list -o wide`    |
-| `cloider_domain`         | The domain name          | `cloider domain list`                    |
-| `cloider_dns_record`     | The record's id          | `cloider dns list <domain> -o wide`      |
-| `cloider_target`         | `<domain>/<id>`          | `cloider target list <domain> -o wide`   |
+| Resource                      | Import ID         | Where to find it                       |
+|-------------------------------|-------------------|----------------------------------------|
+| `cloider_cluster`             | The cluster's id  | `cloider cluster list -o wide`         |
+| `cloider_database`            | The database's id | `cloider db list -o wide`              |
+| `cloider_bucket`              | The bucket's id   | `cloider bucket list -o wide`          |
+| `cloider_bucket_key`          | The key's id      | `cloider bucket key list -o wide`      |
+| `cloider_registry`            | The project's id  | `cloider registry list -o wide`        |
+| `cloider_registry_token`      | The token's id    | `cloider registry token list -o wide`  |
+| `cloider_domain`              | The domain name   | `cloider domain list`                  |
+| `cloider_domain_verification` | The domain name   | `cloider domain list`                  |
+| `cloider_dns_record`          | The record's id   | `cloider dns list <domain> -o wide`    |
+| `cloider_target`              | `<domain>/<id>`   | `cloider target list <domain> -o wide` |
 
 ## Import with `import` Blocks
 

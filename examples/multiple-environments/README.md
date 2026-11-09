@@ -5,8 +5,6 @@ database only the cluster (and, for staging, an office network) can reach, a ver
 key for it. The environments differ only in what the module is given: production gets a larger
 database plan.
 
-Two environments need more than a free account's room for one cluster, one database and one bucket.
-
 ## Usage
 
 ```sh
